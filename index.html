@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Avisador Waze Style</title>
+    <title>Avisador Waze Style Voice</title>
 
     <link href="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css" rel="stylesheet" />
     
@@ -99,7 +99,6 @@
     <div id="map-container">
         <div id="map"></div>
 
-        <!-- HUD Superior -->
         <div class="hud-top">
             <div class="hud-cards-row">
                 <div class="hud-card speed-card">
@@ -116,7 +115,6 @@
 
         <button id="recenterBtn" class="recenter-btn">🎯</button>
 
-        <!-- Buscador inferior tipo Waze -->
         <div id="searchSheet" class="search-sheet">
             <div class="sheet-handle"></div>
             <div class="waze-search-bar">
@@ -126,7 +124,6 @@
             <div id="searchResults" class="search-results-list"></div>
         </div>
 
-        <!-- Pantalla Previsualización Ruta con Conteo de Radares -->
         <div id="routePreviewSheet" class="route-preview-sheet">
             <div class="route-info-row">
                 <div class="route-title" id="previewTitle">Destino</div>
@@ -141,7 +138,6 @@
             </div>
         </div>
 
-        <!-- Botón Detener Navegación -->
         <div id="activeNavSheet" class="active-nav-sheet">
             <button class="btn-stop" id="stopNavBtn">DETENER NAVEGACIÓN</button>
         </div>
@@ -158,6 +154,7 @@
         let userTracking = true;
         let currentPos = { lat: 41.3871, lon: 2.1700, heading: 0, speed: 0 };
         let selectedDestination = null;
+        let detectedRadaresCount = 0;
 
         const destInput = document.getElementById('destInput');
         const searchResults = document.getElementById('searchResults');
@@ -176,6 +173,18 @@
         const radarType = document.getElementById('radarType');
         const radarDist = document.getElementById('radarDist');
         const recenterBtn = document.getElementById('recenterBtn');
+
+        // Motor de Voz (TTS)
+        function speak(text) {
+            if ('speechSynthesis' in window) {
+                window.speechSynthesis.cancel(); // Detener voz anterior si habla encima
+                const utterance = new SpeechSynthesisUtterance(text);
+                utterance.lang = 'es-ES';
+                utterance.rate = 1.0;
+                utterance.pitch = 1.0;
+                window.speechSynthesis.speak(utterance);
+            }
+        }
 
         function initMap() {
             map = new maplibregl.Map({
@@ -240,7 +249,6 @@
             } catch (e) { console.error(e); }
         }
 
-        // Búsqueda manual en tiempo real
         destInput.addEventListener('input', async (e) => {
             const query = e.target.value;
             if (query.length < 3) {
@@ -282,7 +290,6 @@
 
             map.flyTo({ center: [selectedDestination.lon, selectedDestination.lat], zoom: 12, pitch: 0 });
 
-            // Calcular Ruta Real con OSRM
             try {
                 const url = `https://router.project-osrm.org/route/v1/driving/${currentPos.lon},${currentPos.lat};${selectedDestination.lon},${selectedDestination.lat}?overview=full&geometries=geojson`;
                 const res = await fetch(url);
@@ -299,33 +306,31 @@
                 }
             } catch (e) {
                 previewMetrics.innerText = "Ruta directa";
-                routeRadaresCount.innerText = "No se pudieron comprobar radares";
+                routeRadaresCount.innerText = "Sin datos de radares";
             }
         }
 
-        // Analizar y contar radares cercanos al trazado de la ruta (radio ~50 metros)
         function countRadaresOnRoute(coords) {
             if (!radares || !radares.length) {
+                detectedRadaresCount = 0;
                 routeRadaresCount.innerText = "0 radares detectados en la ruta";
                 return;
             }
 
-            let foundCount = 0;
+            detectedRadaresCount = 0;
             radares.forEach(r => {
                 const rLat = parseFloat(r.lat);
                 const rLon = parseFloat(r.lon);
-                // Comprobar si el radar está cerca de alguno de los puntos de la ruta
                 for (let c of coords) {
-                    const dist = getDistanceMeters(c[1], c[0], rLat, rLon);
-                    if (dist < 60) { // Menos de 60 metros de la ruta
-                        foundCount++;
+                    if (getDistanceMeters(c[1], c[0], rLat, rLon) < 60) {
+                        detectedRadaresCount++;
                         break;
                     }
                 }
             });
 
-            if (foundCount > 0) {
-                routeRadaresCount.innerText = `${foundCount} radares detectados en tu camino`;
+            if (detectedRadaresCount > 0) {
+                routeRadaresCount.innerText = `${detectedRadaresCount} radares detectados en tu camino`;
             } else {
                 routeRadaresCount.innerText = "¡Camino limpio! 0 radares en la ruta";
             }
@@ -346,11 +351,15 @@
             }
         }
 
+        // Al pulsar ¡Conducir! habla y arranca
         goRouteBtn.addEventListener('click', () => {
             routePreviewSheet.style.display = 'none';
             activeNavSheet.style.display = 'block';
             isNavigating = true;
             userTracking = true;
+
+            // Voz cantando el inicio de ruta
+            speak(`Iniciando ruta hacia ${selectedDestination.name}. Se han detectado ${detectedRadaresCount} radares en tu camino. Conduce con precaución.`);
 
             if ("geolocation" in navigator) {
                 watchId = navigator.geolocation.watchPosition(
@@ -377,6 +386,7 @@
             activeNavSheet.style.display = 'none';
             searchSheet.style.display = 'block';
             destInput.value = '';
+            speak("Navegación finalizada.");
             if (watchId !== null) navigator.geolocation.clearWatch(watchId);
             if (map.getSource('route-src')) map.removeLayer('route-layer'), map.removeSource('route-src');
             map.easeTo({ pitch: 0, bearing: 0, duration: 800 });
@@ -401,6 +411,7 @@
             }
         }
 
+        let lastAlertedRadar = null;
         function checkProximity(lat, lon) {
             if (!radares.length) return;
             let minDist = Infinity;
@@ -416,8 +427,15 @@
             }
 
             if (closest && minDist < 1200) {
-                radarType.innerText = `${(closest.tipo || 'RADAR').replace('_', ' ')} (${closest.velocidad || 80} km/h)`;
+                const rName = (closest.tipo || 'RADAR').replace('_', ' ');
+                radarType.innerText = `${rName} (${closest.velocidad || 80} km/h)`;
                 radarDist.innerText = `${Math.round(minDist)} m`;
+
+                // Canto por voz inteligente al acercarse a 500 metros por primera vez
+                if (minDist <= 500 && lastAlertedRadar !== closest) {
+                    lastAlertedRadar = closest;
+                    speak(`Atención, radar a 500 metros. Límite de ${closest.velocidad || 80} kilómetros por hora.`);
+                }
             } else {
                 radarType.innerText = "Sin Alertas";
                 radarDist.innerText = "-- m";
