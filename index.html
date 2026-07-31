@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Avisador Waze Style Voice</title>
+    <title>Avisador Waze Style Premium</title>
 
     <link href="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css" rel="stylesheet" />
     
@@ -99,6 +99,7 @@
     <div id="map-container">
         <div id="map"></div>
 
+        <!-- HUD Superior -->
         <div class="hud-top">
             <div class="hud-cards-row">
                 <div class="hud-card speed-card">
@@ -115,6 +116,7 @@
 
         <button id="recenterBtn" class="recenter-btn">🎯</button>
 
+        <!-- Buscador inferior tipo Waze -->
         <div id="searchSheet" class="search-sheet">
             <div class="sheet-handle"></div>
             <div class="waze-search-bar">
@@ -124,6 +126,7 @@
             <div id="searchResults" class="search-results-list"></div>
         </div>
 
+        <!-- Pantalla Previsualización Ruta -->
         <div id="routePreviewSheet" class="route-preview-sheet">
             <div class="route-info-row">
                 <div class="route-title" id="previewTitle">Destino</div>
@@ -138,6 +141,7 @@
             </div>
         </div>
 
+        <!-- Botón Detener Navegación -->
         <div id="activeNavSheet" class="active-nav-sheet">
             <button class="btn-stop" id="stopNavBtn">DETENER NAVEGACIÓN</button>
         </div>
@@ -174,14 +178,12 @@
         const radarDist = document.getElementById('radarDist');
         const recenterBtn = document.getElementById('recenterBtn');
 
-        // Motor de Voz (TTS)
         function speak(text) {
             if ('speechSynthesis' in window) {
-                window.speechSynthesis.cancel(); // Detener voz anterior si habla encima
+                window.speechSynthesis.cancel();
                 const utterance = new SpeechSynthesisUtterance(text);
-                utterance.lang = 'es-ES';
+                utterance.lang = 'esc-ES';
                 utterance.rate = 1.0;
-                utterance.pitch = 1.0;
                 window.speechSynthesis.speak(utterance);
             }
         }
@@ -205,7 +207,7 @@
             map.on('dragstart', () => { userTracking = false; });
 
             map.on('load', () => {
-                loadRadares();
+                loadRadarIconAndData();
                 initRealGPS();
             });
         }
@@ -223,6 +225,25 @@
             }
         }
 
+        // Generar e inyectar icono gráfico vectorial de Radar Fijo (Cámara Estilizada)
+        function loadRadarIconAndData() {
+            const svgIcon = `
+                <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24">
+                    <circle cx="12" cy="12" r="11" fill="#141414" stroke="#ff3d00" stroke-width="2.5"/>
+                    <path fill="#ff3d00" d="M7 9h2l1-2h4l1 2h2a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1v-8a1 1 0 0 1 1-1zm5 8a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7z"/>
+                    <circle cx="12" cy="13.5" r="1.5" fill="#ffffff"/>
+                </svg>
+            `;
+            const blob = new Blob([svgIcon], { type: 'image/svg+xml' });
+            const url = URL.createObjectURL(blob);
+
+            map.loadImage(url, (error, image) => {
+                if (error) throw error;
+                map.addImage('radar-icon', image);
+                loadRadares();
+            });
+        }
+
         async function loadRadares() {
             try {
                 const res = await fetch('radares.json?v=' + new Date().getTime());
@@ -235,15 +256,16 @@
                 }));
 
                 map.addSource('radares-src', { type: 'geojson', data: { type: 'FeatureCollection', features } });
+                
+                // Capa basada en iconos gráficos profesionales en lugar de círculos planos
                 map.addLayer({
                     id: 'radares-layer',
-                    type: 'circle',
+                    type: 'symbol',
                     source: 'radares-src',
-                    paint: {
-                        'circle-radius': 6,
-                        'circle-color': '#ff1744',
-                        'circle-stroke-width': 1,
-                        'circle-stroke-color': '#ffffff'
+                    layout: {
+                        'icon-image': 'radar-icon',
+                        'icon-size': 0.85,
+                        'icon-allow-overlap': true
                     }
                 });
             } catch (e) { console.error(e); }
@@ -351,14 +373,12 @@
             }
         }
 
-        // Al pulsar ¡Conducir! habla y arranca
         goRouteBtn.addEventListener('click', () => {
             routePreviewSheet.style.display = 'none';
             activeNavSheet.style.display = 'block';
             isNavigating = true;
             userTracking = true;
 
-            // Voz cantando el inicio de ruta
             speak(`Iniciando ruta hacia ${selectedDestination.name}. Se han detectado ${detectedRadaresCount} radares en tu camino. Conduce con precaución.`);
 
             if ("geolocation" in navigator) {
@@ -431,7 +451,6 @@
                 radarType.innerText = `${rName} (${closest.velocidad || 80} km/h)`;
                 radarDist.innerText = `${Math.round(minDist)} m`;
 
-                // Canto por voz inteligente al acercarse a 500 metros por primera vez
                 if (minDist <= 500 && lastAlertedRadar !== closest) {
                     lastAlertedRadar = closest;
                     speak(`Atención, radar a 500 metros. Límite de ${closest.velocidad || 80} kilómetros por hora.`);
