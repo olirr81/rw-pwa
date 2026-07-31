@@ -32,7 +32,6 @@
         }
         .search-btn { background: #00e5ff; color: #000; }
         .icon-btn { background: rgba(255,255,255,0.1); color: #00e5ff; border: 1px solid rgba(0,229,255,0.3); }
-        .icon-btn.active { background: #00e5ff; color: #000; }
 
         .settings-panel {
             position: absolute; top: 60px; right: 12px; z-index: 20;
@@ -173,7 +172,8 @@
 
         async function loadRadares() {
             try {
-                const res = await fetch('radares.json');
+                // Añadimos timestamp para evitar caché agresiva en móviles
+                const res = await fetch('radares.json?v=' + new Date().getTime());
                 radares = await res.json();
                 updateMapFilters();
             } catch (e) {
@@ -184,16 +184,30 @@
         function updateMapFilters() {
             if (!radares || !radares.length) return;
 
+            const showSpeed = layerSpeed.checked;
+            const showTraffic = layerTrafficSignals.checked;
+            const showBelt = layerBelt.checked;
+
             const features = radares.filter(r => {
-                const t = (r.tipo || '').toUpperCase();
-                if (layerSpeed.checked && (t.includes('FIJO') || t.includes('MOVIL') || t === 'RADAR_FIJO')) return true;
-                if (layerTrafficSignals.checked && (t.includes('ROJO') || t.includes('SEMAFORO') || t === 'FOTO_ROJO')) return true;
-                if (layerBelt.checked && (t.includes('CINTURON') || t === 'CAMARA_CINTURON')) return true;
-                return false;
+                const t = String(r.tipo || '').toUpperCase();
+                
+                if (t.includes('ROJO') || t.includes('SEMAFORO') || t.includes('TRAFFIC_SIGNALS')) {
+                    return showTraffic;
+                }
+                if (t.includes('CINTURON') || t.includes('MOVIL') || t.includes('BELT') || t.includes('PHONE')) {
+                    return showBelt;
+                }
+                return showSpeed;
             }).map(r => ({
                 type: 'Feature',
-                geometry: { type: 'Point', coordinates: [Number(r.lon), Number(r.lat)] },
-                properties: { tipo: r.tipo, vel: r.velocidad || 80 }
+                geometry: { 
+                    type: 'Point', 
+                    coordinates: [parseFloat(r.lon), parseFloat(r.lat)] 
+                },
+                properties: { 
+                    tipo: r.tipo || 'RADAR_FIJO', 
+                    vel: r.velocidad || 80 
+                }
             }));
 
             const geojson = { type: 'FeatureCollection', features };
@@ -207,14 +221,14 @@
                     type: 'circle',
                     source: 'radares-src',
                     paint: {
-                        'circle-radius': 7,
+                        'circle-radius': 6,
                         'circle-color': [
                             'match', ['get', 'tipo'],
                             'FOTO_ROJO', '#ffea00',
                             'CAMARA_CINTURON', '#e040fb',
                             '#ff1744'
                         ],
-                        'circle-stroke-width': 1.5,
+                        'circle-stroke-width': 1,
                         'circle-stroke-color': '#ffffff'
                     }
                 });
@@ -249,7 +263,7 @@
 
             for (let i = 0; i < radares.length; i++) {
                 const r = radares[i];
-                const d = getDistanceMeters(lat, lon, Number(r.lat), Number(r.lon));
+                const d = getDistanceMeters(lat, lon, parseFloat(r.lat), parseFloat(r.lon));
                 if (d < minDist) {
                     minDist = d;
                     closest = r;
@@ -275,7 +289,6 @@
             return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
         }
 
-        // Búsqueda de destinos (Nominatim Geocoding)
         searchBtn.addEventListener('click', async () => {
             const query = destInput.value;
             if (!query) return;
@@ -291,7 +304,6 @@
             } catch (e) { console.error(e); }
         });
 
-        // Botón Navegación
         toggleBtn.addEventListener('click', () => {
             isNavigating = !isNavigating;
 
@@ -299,7 +311,6 @@
                 toggleBtn.innerText = "DETENER NAVEGACIÓN";
                 toggleBtn.className = "btn btn-active";
 
-                // Intenta usar GPS real si existe
                 if ("geolocation" in navigator) {
                     watchId = navigator.geolocation.watchPosition(
                         (pos) => {
@@ -311,7 +322,6 @@
                     );
                 }
 
-                // Simulación para pruebas
                 let simLat = currentPos.lat;
                 let simLon = currentPos.lon;
                 simInterval = setInterval(() => {
