@@ -86,7 +86,7 @@
         }
 
         .user-location-marker { width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; }
-        .user-arrow { width: 0; height: 0; border-left: 9px solid transparent; border-right: 9px solid transparent; border-bottom: 22px solid #00e5ff; filter: drop-shadow(0 0 8px #00e5ff); transition: transform 0.3s ease-out; }
+        .user-arrow { width: 0; height: 0; border-left: 9px solid transparent; border-right: 9px solid transparent; border-bottom: 22px solid #00e5ff; filter: drop-shadow(0 0 8px #00e5ff); transition: transition 0.3s ease-out; }
     </style>
 </head>
 <body>
@@ -263,26 +263,42 @@
             });
         }
 
-        function addRadaresLayerToMap() {
+        function addRadaresLayerToMap(routeRadaresIds = []) {
             if (!radares.length) return;
-            const features = radares.map(r => ({
+            const features = radares.map((r, index) => ({
                 type: 'Feature',
                 geometry: { type: 'Point', coordinates: [parseFloat(r.lon), parseFloat(r.lat)] },
-                properties: { tipo: r.tipo || 'RADAR_FIJO', vel: r.velocidad || 80 }
+                properties: { 
+                    tipo: r.tipo || 'RADAR_FIJO', 
+                    vel: r.velocidad || 80,
+                    isOnRoute: routeRadaresIds.includes(index) ? 1 : 0
+                }
             }));
 
             if (map.getSource('radares-src')) {
                 map.getSource('radares-src').setData({ type: 'FeatureCollection', features });
             } else {
                 map.addSource('radares-src', { type: 'geojson', data: { type: 'FeatureCollection', features } });
+                
                 map.addLayer({
                     id: 'radares-layer',
                     type: 'symbol',
                     source: 'radares-src',
                     layout: {
                         'icon-image': 'radar-icon',
-                        'icon-size': 0.85,
-                        'icon-allow-overlap': true
+                        // ESCALADO DINÁMICO WAZESQUE: 
+                        // Zoom bajo (ej. mapa de Europa o España entero) -> muy pequeños (0.3)
+                        // Zoom medio (ciudad) -> tamaño normal (0.7)
+                        // Zoom alto (calle/navegación) -> grandes y destacados (1.1)
+                        'icon-size': [
+                            'case',
+                            ['==', ['get', 'isOnRoute'], 1],
+                            ['interpolate', ['linear'], ['zoom'], 6, 0.6, 12, 0.9, 16, 1.3], // Los de la ruta destacan más
+                            ['interpolate', ['linear'], ['zoom'], 5, 0.2, 10, 0.45, 14, 0.8, 17, 1.1] // Resto de radares
+                        ],
+                        'icon-allow-overlap': true,
+                        // Aparecen desde zoom 5 para que se vean en vistas generales continentales de forma sutil
+                        'minzoom': 5
                     }
                 });
             }
@@ -341,7 +357,7 @@
                     previewMetrics.innerText = `${mins} min • ${km} km`;
 
                     drawRouteLine(route.geometry);
-                    countRadaresOnRoute(route.geometry.coordinates);
+                    markRadaresOnRoute(route.geometry.coordinates);
                 }
             } catch (e) {
                 previewMetrics.innerText = "Ruta directa";
@@ -349,25 +365,30 @@
             }
         }
 
-        function countRadaresOnRoute(coords) {
+        function markRadaresOnRoute(coords) {
             if (!radares || !radares.length) {
                 detectedRadaresCount = 0;
                 routeRadaresCount.innerText = "0 radares detectados en la ruta";
                 return;
             }
 
+            const routeRadaresIndices = [];
             detectedRadaresCount = 0;
-            // Ampliamos el radio de cobertura a 300 metros del trazado para garantizar que pille autovías/carreteras
-            radares.forEach(r => {
+
+            radares.forEach((r, index) => {
                 const rLat = parseFloat(r.lat);
                 const rLon = parseFloat(r.lon);
-                for (let i = 0; i < coords.length; i += Math.max(1, Math.floor(coords.length / 200))) {
+                for (let i = 0; i < coords.length; i += Math.max(1, Math.floor(coords.length / 250))) {
                     if (getDistanceMeters(coords[i][1], coords[i][0], rLat, rLon) < 300) {
                         detectedRadaresCount++;
+                        routeRadaresIndices.push(index);
                         break;
                     }
                 }
             });
+
+            // Actualizamos la capa para que los radares de la ruta tengan un icono mayor y se distingan
+            addRadaresLayerToMap(routeRadaresIndices);
 
             if (detectedRadaresCount > 0) {
                 routeRadaresCount.innerText = `${detectedRadaresCount} radares detectados en tu camino`;
@@ -416,6 +437,7 @@
             searchSheet.style.display = 'block';
             destInput.value = '';
             if (map.getSource('route-src')) map.removeLayer('route-layer'), map.removeSource('route-src');
+            addRadaresLayerToMap([]); // Resetea el resaltado de ruta
             map.flyTo({ center: [currentPos.lon, currentPos.lat], zoom: 15 });
         });
 
@@ -427,6 +449,7 @@
             speak("Navegación finalizada.");
             if (watchId !== null) navigator.geolocation.clearWatch(watchId);
             if (map.getSource('route-src')) map.removeLayer('route-layer'), map.removeSource('route-src');
+            addRadaresLayerToMap([]);
             map.easeTo({ pitch: 0, bearing: 0, duration: 800 });
         });
 
