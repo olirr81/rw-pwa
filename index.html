@@ -5,18 +5,17 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Avisador 3D - Waze Killer</title>
 
-    <!-- CSS MapLibre GL JS (Mapa Vectorial 3D) -->
+    <!-- CSS MapLibre GL JS -->
     <link href="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css" rel="stylesheet" />
     
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
         body { background-color: #0d0d0d; color: #ffffff; height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
         
-        /* Contenedor del Mapa 3D ocupa toda la pantalla */
         #map-container { flex: 1; position: relative; width: 100%; height: 100%; }
         #map { width: 100%; height: 100%; }
 
-        /* HUD Superior (Velocidad y Alerta de Radar) */
+        /* HUD Superior */
         .hud-top {
             position: absolute;
             top: 12px;
@@ -24,28 +23,81 @@
             right: 12px;
             z-index: 10;
             display: flex;
-            gap: 10px;
+            flex-direction: column;
+            gap: 8px;
         }
+
+        /* Searchbar Destino */
+        .search-box {
+            display: flex;
+            gap: 8px;
+            background: rgba(20, 20, 20, 0.9);
+            backdrop-filter: blur(12px);
+            border-radius: 14px;
+            padding: 6px 10px;
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            box-shadow: 0 8px 32px rgba(0,0,0,0.6);
+        }
+
+        .search-input {
+            flex: 1;
+            background: transparent;
+            border: none;
+            color: #fff;
+            font-size: 0.95rem;
+            padding: 8px;
+            outline: none;
+        }
+
+        .search-btn, .clear-btn {
+            background: #00e5ff;
+            color: #000;
+            border: none;
+            border-radius: 10px;
+            padding: 0 14px;
+            font-weight: 800;
+            font-size: 0.85rem;
+            cursor: pointer;
+        }
+        .clear-btn { background: #ff3d00; color: #fff; display: none; }
+
+        /* Indicación Turn-by-Turn */
+        .turn-card {
+            background: rgba(15, 23, 42, 0.95);
+            backdrop-filter: blur(12px);
+            border-radius: 14px;
+            padding: 10px 14px;
+            border: 1px solid rgba(0, 229, 255, 0.3);
+            display: none; /* Se activa cuando hay ruta */
+            align-items: center;
+            gap: 12px;
+        }
+        .turn-icon { font-size: 1.8rem; color: #00e5ff; }
+        .turn-info { flex: 1; }
+        .turn-dist { font-size: 1.2rem; font-weight: 900; color: #00e5ff; }
+        .turn-street { font-size: 0.85rem; color: #cbd5e1; font-weight: 600; }
+
+        .hud-cards-row { display: flex; gap: 8px; }
 
         .hud-card {
             background: rgba(20, 20, 20, 0.85);
             backdrop-filter: blur(10px);
-            border-radius: 16px;
-            padding: 12px 16px;
+            border-radius: 14px;
+            padding: 10px 14px;
             border: 1px solid rgba(255, 255, 255, 0.1);
             box-shadow: 0 8px 32px rgba(0,0,0,0.5);
         }
 
         .speed-card { flex: 1; text-align: center; }
-        .speed-val { font-size: 2.2rem; font-weight: 900; color: #00e5ff; line-height: 1; }
-        .speed-unit { font-size: 0.75rem; color: #aaa; text-transform: uppercase; margin-top: 2px; }
+        .speed-val { font-size: 2rem; font-weight: 900; color: #00e5ff; line-height: 1; }
+        .speed-unit { font-size: 0.7rem; color: #aaa; text-transform: uppercase; }
 
         .radar-hud { flex: 2; border-left: 4px solid #ff3d00; display: flex; flex-direction: column; justify-content: center; }
-        .radar-title { font-size: 0.75rem; color: #aaa; text-transform: uppercase; }
-        .radar-info { font-size: 1.1rem; font-weight: bold; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .radar-dist-val { font-size: 1.4rem; font-weight: 900; color: #ff3d00; }
+        .radar-title { font-size: 0.7rem; color: #aaa; text-transform: uppercase; }
+        .radar-info { font-size: 1rem; font-weight: bold; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .radar-dist-val { font-size: 1.3rem; font-weight: 900; color: #ff3d00; }
 
-        /* Controles Inferiores */
+        /* HUD Inferior */
         .hud-bottom {
             position: absolute;
             bottom: 20px;
@@ -54,7 +106,7 @@
             z-index: 10;
             display: flex;
             flex-direction: column;
-            gap: 10px;
+            gap: 8px;
         }
 
         .btn {
@@ -66,30 +118,45 @@
             font-size: 1.1rem;
             cursor: pointer;
             box-shadow: 0 4px 20px rgba(0,0,0,0.4);
-            transition: all 0.2s ease;
         }
         .btn-active { background: linear-gradient(135deg, #00c853, #00e676); color: #000; }
         .btn-inactive { background: linear-gradient(135deg, #d50000, #ff1744); color: #fff; }
 
-        /* Consola de Logs desplegable/pequeña */
+        .recenter-btn {
+            position: absolute;
+            right: 12px;
+            bottom: 140px;
+            z-index: 10;
+            background: rgba(20, 20, 20, 0.9);
+            border: 1px solid rgba(255,255,255,0.2);
+            color: #00e5ff;
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            font-size: 1.2rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+            cursor: pointer;
+        }
+
         .logs-card {
-            background: rgba(0, 0, 0, 0.8);
+            background: rgba(0, 0, 0, 0.85);
             backdrop-filter: blur(5px);
             border-radius: 10px;
-            padding: 8px;
+            padding: 6px 10px;
             font-family: monospace;
-            font-size: 0.7rem;
+            font-size: 0.65rem;
             color: #00ff66;
-            max-height: 60px;
+            max-height: 50px;
             overflow-y: auto;
             border: 1px solid rgba(255,255,255,0.05);
         }
 
-        /* Marcador de Vehículo 3D / Flecha estilo Waze */
         .user-location-marker {
             width: 40px;
             height: 40px;
-            background: radial-gradient(circle, rgba(0,229,255,0.4) 0%, rgba(0,229,255,0) 70%);
             display: flex;
             align-items: center;
             justify-content: center;
@@ -100,38 +167,57 @@
             border-left: 10px solid transparent;
             border-right: 10px solid transparent;
             border-bottom: 24px solid #00e5ff;
-            filter: drop-shadow(0 0 8px #00e5ff);
-            transition: transform 0.3s ease;
+            filter: drop-shadow(0 0 10px #00e5ff);
+            transition: transform 0.2s ease;
         }
     </style>
 </head>
 <body>
 
     <div id="map-container">
-        <!-- Mapa Vectorial 3D -->
         <div id="map"></div>
 
         <!-- HUD Superior -->
         <div class="hud-top">
-            <div class="hud-card speed-card">
-                <div class="speed-val" id="speedDisplay">0</div>
-                <div class="speed-unit">km/h</div>
+            <!-- Buscador de Destino -->
+            <div class="search-box">
+                <input type="text" id="destInput" class="search-input" placeholder="🔍 Buscar destino (ej: Sitges)..." />
+                <button id="searchBtn" class="search-btn">IR</button>
+                <button id="clearRouteBtn" class="clear-btn">❌</button>
             </div>
-            <div class="hud-card radar-hud">
-                <div class="radar-title">Radar en ruta</div>
-                <div class="radar-info" id="radarType">Buscando...</div>
-                <div class="radar-dist-val" id="radarDist">-- m</div>
+
+            <!-- Panel de Giro (Turn-by-Turn) -->
+            <div id="turnCard" class="turn-card">
+                <div id="turnIcon" class="turn-icon">⬆️</div>
+                <div class="turn-info">
+                    <div id="turnDist" class="turn-dist">-- m</div>
+                    <div id="turnStreet" class="turn-street">Calculando ruta...</div>
+                </div>
+            </div>
+
+            <div class="hud-cards-row">
+                <div class="hud-card speed-card">
+                    <div class="speed-val" id="speedDisplay">0</div>
+                    <div class="speed-unit">km/h</div>
+                </div>
+                <div class="hud-card radar-hud">
+                    <div class="radar-title">Radar en ruta</div>
+                    <div class="radar-info" id="radarType">Buscando...</div>
+                    <div class="radar-dist-val" id="radarDist">-- m</div>
+                </div>
             </div>
         </div>
+
+        <!-- Botón Re-centrar -->
+        <button id="recenterBtn" class="recenter-btn">🎯</button>
 
         <!-- HUD Inferior -->
         <div class="hud-bottom">
-            <div class="logs-card" id="logs">Iniciando motor 3D MapLibre...\n</div>
-            <button id="toggleBtn" class="btn btn-inactive">INICIAR MODO NAVEGACIÓN 3D</button>
+            <div class="logs-card" id="logs">Iniciando GPS & Motor de Rutas 3D...\n</div>
+            <button id="toggleBtn" class="btn btn-inactive">INICIAR NAVEGACIÓN 3D</button>
         </div>
     </div>
 
-    <!-- Script de MapLibre GL JS -->
     <script src="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.js"></script>
 
     <script>
@@ -140,14 +226,23 @@
         let watchId = null;
         let radares = [];
         let wakeLock = null;
-        let lastPosition = null;
+        let currentPos = { lat: 41.1995, lon: 1.6279 }; // Posición inicial por defecto (Cunit)
         let currentHeading = 0;
         let userMarkerElement, userMarker;
+        let activeRouteSteps = [];
 
         const speedDisplay = document.getElementById('speedDisplay');
         const radarType = document.getElementById('radarType');
         const radarDist = document.getElementById('radarDist');
         const toggleBtn = document.getElementById('toggleBtn');
+        const recenterBtn = document.getElementById('recenterBtn');
+        const destInput = document.getElementById('destInput');
+        const searchBtn = document.getElementById('searchBtn');
+        const clearRouteBtn = document.getElementById('clearRouteBtn');
+        const turnCard = document.getElementById('turnCard');
+        const turnIcon = document.getElementById('turnIcon');
+        const turnDist = document.getElementById('turnDist');
+        const turnStreet = document.getElementById('turnStreet');
 
         function log(msg) {
             const logs = document.getElementById('logs');
@@ -156,43 +251,168 @@
             logs.scrollTop = logs.scrollHeight;
         }
 
-        // --- 1. Inicializar Mapa 3D Vectorial ---
+        // --- 1. Inicializar Mapa 3D ---
         function init3DMap() {
-            // Estilo Vectorial Oscuro Gratuito (CartoDB Dark Matter Vector)
             map = new maplibregl.Map({
                 container: 'map',
                 style: 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json',
-                center: [2.1734, 41.3851], // [Lon, Lat] -> Barcelona por defecto
+                center: [currentPos.lon, currentPos.lat],
                 zoom: 16,
-                pitch: 60, // Inclinación 3D estilo Waze (60 grados)
-                bearing: 0, // Rotación según dirección del coche
+                pitch: 60,
+                bearing: 0,
                 antialias: true
             });
 
-            // Crear marcador de vehículo tipo flecha 3D
             userMarkerElement = document.createElement('div');
             userMarkerElement.className = 'user-location-marker';
             userMarkerElement.innerHTML = '<div class="user-arrow" id="userArrow"></div>';
             
             userMarker = new maplibregl.Marker({ element: userMarkerElement })
-                .setLngLat([2.1734, 41.3851])
+                .setLngLat([currentPos.lon, currentPos.lat])
                 .addTo(map);
 
             map.on('load', () => {
-                log("🗺️ Mapa 3D cargado correctamente.");
+                log("🗺️ Mapa 3D preparado.");
                 loadRadares();
+                initRouteLayer();
+            });
+
+            // Permitir hacer click en el mapa para fijar destino directamente
+            map.on('click', (e) => {
+                calculateRoute(e.lngLat.lat, e.lngLat.lng);
             });
         }
 
-        // --- 2. Cargar Radares en Capa Vectorial de MapLibre ---
+        // --- 2. Capas de Ruta (Glow / Neón) ---
+        function initRouteLayer() {
+            map.addSource('route-src', {
+                type: 'geojson',
+                data: { type: 'FeatureCollection', features: [] }
+            });
+
+            // Sombra / Resplandor Neón
+            map.addLayer({
+                id: 'route-glow',
+                type: 'line',
+                source: 'route-src',
+                layout: { 'line-join': 'round', 'line-cap': 'round' },
+                paint: {
+                    'line-color': '#a855f7',
+                    'line-width': 12,
+                    'line-opacity': 0.5,
+                    'line-blur': 4
+                }
+            });
+
+            // Línea principal de ruta
+            map.addLayer({
+                id: 'route-line',
+                type: 'line',
+                source: 'route-src',
+                layout: { 'line-join': 'round', 'line-cap': 'round' },
+                paint: {
+                    'line-color': '#c084fc',
+                    'line-width': 6
+                }
+            });
+        }
+
+        // --- 3. Calcular Ruta con OSRM API ---
+        async function calculateRoute(destLat, destLon) {
+            log("📍 Calculando ruta a destino...");
+            const url = `https://router.project-osrm.org/route/v1/driving/${currentPos.lon},${currentPos.lat};${destLon},${destLat}?overview=full&geometries=geojson&steps=true`;
+
+            try {
+                const res = await fetch(url);
+                const data = await res.json();
+
+                if (data.routes && data.routes.length > 0) {
+                    const route = data.routes[0];
+                    activeRouteSteps = route.legs[0].steps;
+
+                    // Dibujar la ruta en el mapa
+                    map.getSource('route-src').setData({
+                        type: 'Feature',
+                        geometry: route.geometry
+                    });
+
+                    turnCard.style.display = 'flex';
+                    clearRouteBtn.style.display = 'block';
+                    log(`🚀 Ruta calculada: ${(route.distance / 1000).toFixed(1)} km`);
+                    
+                    updateTurnInstructions();
+                }
+            } catch (err) {
+                log("⚠️ Error calculando ruta: " + err.message);
+            }
+        }
+
+        // --- 4. Buscar por Nombre de Ciudad / Calle (Nominatim Free) ---
+        searchBtn.addEventListener('click', async () => {
+            const query = destInput.value;
+            if (!query) return;
+
+            log(`Buscando "${query}"...`);
+            try {
+                const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}`);
+                const data = await res.json();
+
+                if (data && data.length > 0) {
+                    const target = data[0];
+                    calculateRoute(parseFloat(target.lat), parseFloat(target.lon));
+                } else {
+                    log("❌ No se encontró la ubicación.");
+                }
+            } catch (e) {
+                log("⚠️ Error en búsqueda.");
+            }
+        });
+
+        clearRouteBtn.addEventListener('click', () => {
+            map.getSource('route-src').setData({ type: 'FeatureCollection', features: [] });
+            activeRouteSteps = [];
+            turnCard.style.display = 'none';
+            clearRouteBtn.style.display = 'none';
+            destInput.value = '';
+            log("Ruta cancelada.");
+        });
+
+        // --- 5. Actualizar Instrucciones Turn-by-Turn ---
+        function updateTurnInstructions() {
+            if (activeRouteSteps.length === 0) return;
+
+            const nextStep = activeRouteSteps[0];
+            const dist = getDistance(currentPos.lat, currentPos.lon, nextStep.maneuver.location[1], nextStep.maneuver.location[0]);
+
+            turnDist.innerText = dist > 1000 ? `${(dist / 1000).toFixed(1)} km` : `${Math.round(dist)} m`;
+            turnStreet.innerText = nextStep.name || "Sigue por la vía actual";
+
+            // Asignar icono según tipo de maniobra
+            const type = nextStep.maneuver.type;
+            const modifier = nextStep.maneuver.modifier;
+
+            if (type.includes('turn')) {
+                if (modifier && modifier.includes('right')) turnIcon.innerText = '↗️';
+                else if (modifier && modifier.includes('left')) turnIcon.innerText = '↖️';
+                else turnIcon.innerText = '⬆️';
+            } else if (type.includes('roundabout')) {
+                turnIcon.innerText = '🔄';
+            } else {
+                turnIcon.innerText = '⬆️';
+            }
+
+            // Si estamos a menos de 25m de la maniobra, pasar a la siguiente
+            if (dist < 25 && activeRouteSteps.length > 1) {
+                activeRouteSteps.shift();
+            }
+        }
+
+        // --- 6. Cargar Radares ---
         async function loadRadares() {
             try {
-                log("Cargando radares.json...");
                 const res = await fetch('radares.json');
                 radares = await res.json();
-                log(`¡ÉXITO! ${radares.length} radares listos.`);
 
-                // Convertir array de radares a GeoJSON para MapLibre
                 const geojsonRadares = {
                     type: 'FeatureCollection',
                     features: radares.map(r => ({
@@ -202,51 +422,25 @@
                     }))
                 };
 
-                // Añadir la fuente de datos al mapa
-                map.addSource('radares-src', {
-                    type: 'geojson',
-                    data: geojsonRadares
-                });
-
-                // Renderizar radares como círculos 3D brillantes en el mapa
+                map.addSource('radares-src', { type: 'geojson', data: geojsonRadares });
                 map.addLayer({
                     id: 'radares-layer',
                     type: 'circle',
                     source: 'radares-src',
                     paint: {
-                        'circle-radius': 6,
+                        'circle-radius': 7,
                         'circle-color': '#ff3d00',
                         'circle-stroke-width': 2,
                         'circle-stroke-color': '#ffffff',
-                        'circle-opacity': 0.9
+                        'circle-opacity': 0.95
                     }
                 });
-
             } catch (e) {
-                log("⚠️ Error cargando radares: " + e.message);
+                log("⚠️ Error radares: " + e.message);
             }
         }
 
-        // --- 3. Wake Lock ---
-        async function requestWakeLock() {
-            try {
-                if ('wakeLock' in navigator) {
-                    wakeLock = await navigator.wakeLock.request('screen');
-                    log("💡 Pantalla bloqueada para permanecer encendida.");
-                }
-            } catch (err) {
-                log(`⚠️ Wake Lock error: ${err.message}`);
-            }
-        }
-
-        function releaseWakeLock() {
-            if (wakeLock) {
-                wakeLock.release();
-                wakeLock = null;
-            }
-        }
-
-        // --- 4. Matemáticas de Distancia y Rumbo (Bearing) ---
+        // --- 7. Utilitarios de Distancia y Rumbo ---
         function getDistance(lat1, lon1, lat2, lon2) {
             const R = 6371e3;
             const φ1 = lat1 * Math.PI / 180, φ2 = lat2 * Math.PI / 180;
@@ -262,7 +456,7 @@
             return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
         }
 
-        // --- 5. Tracking GPS & Cámara 3D ---
+        // --- 8. Tracking GPS ---
         function handlePosition(pos) {
             const lat = pos.coords.latitude;
             const lon = pos.coords.longitude;
@@ -270,38 +464,35 @@
             
             speedDisplay.innerText = speedKmH;
 
-            // Si el GPS nos da dirección o la calculamos por movimiento
             if (pos.coords.heading !== null && !isNaN(pos.coords.heading)) {
                 currentHeading = pos.coords.heading;
-            } else if (lastPosition) {
-                const distMoved = getDistance(lastPosition.lat, lastPosition.lon, lat, lon);
+            } else if (currentPos) {
+                const distMoved = getDistance(currentPos.lat, currentPos.lon, lat, lon);
                 if (distMoved > 2) {
-                    currentHeading = calculateBearing(lastPosition.lat, lastPosition.lon, lat, lon);
+                    currentHeading = calculateBearing(currentPos.lat, currentPos.lon, lat, lon);
                 }
             }
-            lastPosition = { lat, lon };
+            currentPos = { lat, lon };
 
-            // 1. Mover el marcador del vehículo
             userMarker.setLngLat([lon, lat]);
 
-            // 2. Transición suave de cámara 3D siguiendo al coche y orientando el mapa
             map.easeTo({
                 center: [lon, lat],
-                bearing: currentHeading, // El mapa gira automáticamente según tu marcha
-                pitch: 60,               // Mantiene la inclinación 3D
+                bearing: currentHeading,
+                pitch: 60,
                 duration: 1000,
                 easing: (t) => t
             });
 
-            // 3. Buscar el radar más cercano en tu rumbo
+            updateTurnInstructions();
+
+            // Filtrar radares cercanos
             if (radares.length > 0) {
                 let minDist = Infinity;
                 let closestRadar = null;
 
                 radares.forEach(r => {
                     const d = getDistance(lat, lon, r.lat, r.lon);
-                    
-                    // Comprobar que el radar esté enfrente (±60°)
                     const bearingToRadar = calculateBearing(lat, lon, r.lat, r.lon);
                     const diff = Math.abs(currentHeading - bearingToRadar);
                     const angle = diff > 180 ? 360 - diff : diff;
@@ -319,15 +510,19 @@
             }
         }
 
-        // --- Toggle Activar / Desactivar ---
+        recenterBtn.addEventListener('click', () => {
+            map.flyTo({ center: [currentPos.lon, currentPos.lat], zoom: 16, pitch: 60, bearing: currentHeading });
+        });
+
+        // Toggle Navegación
         toggleBtn.addEventListener('click', () => {
             if (!isRunning) {
                 isRunning = true;
                 toggleBtn.innerText = "DETENER NAVEGACIÓN";
                 toggleBtn.className = "btn btn-active";
-                requestWakeLock();
                 
-                log("Rastreando posición GPS en modo 3D...");
+                if ('wakeLock' in navigator) navigator.wakeLock.request('screen').then(w => wakeLock = w);
+                
                 watchId = navigator.geolocation.watchPosition(
                     handlePosition,
                     (err) => log(`⚠️ Error GPS: ${err.message}`),
@@ -335,17 +530,14 @@
                 );
             } else {
                 isRunning = false;
-                toggleBtn.innerText = "INICIAR MODO NAVEGACIÓN 3D";
+                toggleBtn.innerText = "INICIAR NAVEGACIÓN 3D";
                 toggleBtn.className = "btn btn-inactive";
-                releaseWakeLock();
+                if (wakeLock) wakeLock.release();
                 if (watchId) navigator.geolocation.clearWatch(watchId);
-                log("Navegación detenida.");
             }
         });
 
-        window.addEventListener('DOMContentLoaded', () => {
-            init3DMap();
-        });
+        window.addEventListener('DOMContentLoaded', init3DMap);
     </script>
 </body>
 </html>
