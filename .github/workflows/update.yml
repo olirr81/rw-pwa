@@ -19,6 +19,9 @@ jobs:
       with:
         python-version: '3.10'
 
+    - name: Instalar dependencias
+      run: pip install requests
+
     - name: Ejecutar script de extracción de radares
       run: python scripts/update_radares.py
 
