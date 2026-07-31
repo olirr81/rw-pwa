@@ -236,7 +236,7 @@
             try {
                 const res = await fetch('radares.json?v=' + new Date().getTime());
                 radares = await res.json();
-                console.log("Radares cargados con éxito:", radares.length);
+                console.log("Radares cargados:", radares.length);
             } catch (e) {
                 console.error("Error al cargar radares.json:", e);
                 radares = [];
@@ -260,34 +260,24 @@
             } else {
                 map.addSource('radares-src', { type: 'geojson', data: { type: 'FeatureCollection', features } });
                 
-                // Usamos capa de tipo 'circle' altamente optimizada: nunca fallan al renderizar
                 map.addLayer({
                     id: 'radares-layer',
                     type: 'circle',
                     source: 'radares-src',
                     paint: {
-                        // Tamaño dinámico según zoom y si pertenecen a la ruta
                         'circle-radius': [
                             'case',
                             ['==', ['get', 'isOnRoute'], 1],
-                            // Si están en la ruta: grandes y muy visibles
-                            ['interpolate', ['linear'], ['zoom'], 6, 4, 12, 7, 16, 12],
-                            // Resto de radares: pequeños de lejos, grandes de cerca
+                            ['interpolate', ['linear'], ['zoom'], 6, 5, 12, 8, 16, 14],
                             ['interpolate', ['linear'], ['zoom'], 5, 1.5, 10, 3, 14, 6, 17, 9]
                         ],
-                        // Color naranja/rojo brillante Waze style con borde blanco para contraste
                         'circle-color': [
                             'case',
                             ['==', ['get', 'isOnRoute'], 1],
-                            '#ff3d00', // Naranja intenso ruta
-                            '#ff6e40'  // Naranja normal mapa
+                            '#ff3d00',
+                            '#ff6e40'
                         ],
-                        'circle-stroke-width': [
-                            'case',
-                            ['==', ['get', 'isOnRoute'], 1],
-                            2.5,
-                            1
-                        ],
+                        'circle-stroke-width': ['case', ['==', ['get', 'isOnRoute'], 1], 3, 1],
                         'circle-stroke-color': '#ffffff',
                         'circle-opacity': 0.95
                     }
@@ -334,7 +324,7 @@
             routeRadaresCount.innerText = "Analizando radares en el camino...";
             routePreviewSheet.style.display = 'flex';
 
-            map.flyTo({ center: [selectedDestination.lon, selectedDestination.lat], zoom: 8, pitch: 0 });
+            map.flyTo({ center: [selectedDestination.lon, selectedDestination.lat], zoom: 9, pitch: 0 });
 
             try {
                 const url = `https://router.project-osrm.org/route/v1/driving/${currentPos.lon},${currentPos.lat};${selectedDestination.lon},${selectedDestination.lat}?overview=full&geometries=geojson`;
@@ -349,11 +339,42 @@
 
                     drawRouteLine(route.geometry);
                     markRadaresOnRoute(route.geometry.coordinates);
+                } else {
+                    throw new Error("No route found");
                 }
             } catch (e) {
+                console.warn("OSRM falló, usando línea recta de respaldo");
+                const fallbackGeom = {
+                    type: 'LineString',
+                    coordinates: [[currentPos.lon, currentPos.lat], [selectedDestination.lon, selectedDestination.lat]]
+                };
                 previewMetrics.innerText = "Ruta directa";
-                routeRadaresCount.innerText = "Sin datos de radares";
+                drawRouteLine(fallbackGeom);
+                markRadaresOnRoute(fallbackGeom.coordinates);
             }
+        }
+
+        function drawRouteLine(geojsonGeom) {
+            if (map.getSource('route-src')) {
+                map.getSource('route-src').setData({ type: 'Feature', geometry: geojsonGeom });
+            } else {
+                map.addSource('route-src', { type: 'geojson', data: { type: 'Feature', geometry: geojsonGeom } });
+                
+                // Aseguramos que la capa de ruta se añade de forma segura por debajo de los radares
+                const beforeLayer = map.getLayer('radares-layer') ? 'radares-layer' : undefined;
+                map.addLayer({
+                    id: 'route-layer',
+                    type: 'line',
+                    source: 'route-src',
+                    layout: { 'line-join': 'round', 'line-cap': 'round' },
+                    paint: { 'line-color': '#00e5ff', 'line-width': 6, 'line-opacity': 0.85 }
+                }, beforeLayer);
+            }
+
+            // Ajustar vista para que se vea toda la ruta con margen
+            const coords = geojsonGeom.coordinates;
+            const bounds = coords.reduce((b, coord) => b.extend(coord), new maplibregl.LngLatBounds(coords[0], coords[0]));
+            map.fitBounds(bounds, { padding: 60, maxZoom: 15, duration: 800 });
         }
 
         function markRadaresOnRoute(coords) {
@@ -387,28 +408,13 @@
             }
         }
 
-        function drawRouteLine(geojsonGeom) {
-            if (map.getSource('route-src')) {
-                map.getSource('route-src').setData({ type: 'Feature', geometry: geojsonGeom });
-            } else {
-                map.addSource('route-src', { type: 'geojson', data: { type: 'Feature', geometry: geojsonGeom } });
-                map.addLayer({
-                    id: 'route-layer',
-                    type: 'line',
-                    source: 'route-src',
-                    layout: { 'line-join': 'round', 'line-cap': 'round' },
-                    paint: { 'line-color': '#00e5ff', 'line-width': 6, 'line-opacity': 0.85 }
-                }, 'radares-layer');
-            }
-        }
-
         goRouteBtn.addEventListener('click', () => {
             routePreviewSheet.style.display = 'none';
             activeNavSheet.style.display = 'block';
             isNavigating = true;
             userTracking = true;
 
-            speak(`Iniciando ruta hacia ${selectedDestination.name}. Se han detectado ${detectedRadaresCount} radares en tu camino. Conduce con precaución.`);
+            speak(`Iniciando ruta hacia ${selectedDestination.name}. Se han detectado ${detectedRadaresCount} radares en tu camino.`);
 
             if ("geolocation" in navigator) {
                 watchId = navigator.geolocation.watchPosition(
@@ -426,7 +432,8 @@
             routePreviewSheet.style.display = 'none';
             searchSheet.style.display = 'block';
             destInput.value = '';
-            if (map.getSource('route-src')) map.removeLayer('route-layer'), map.removeSource('route-src');
+            if (map.getLayer('route-layer')) map.removeLayer('route-layer');
+            if (map.getSource('route-src')) map.removeSource('route-src');
             addRadaresLayerToMap([]);
             map.flyTo({ center: [currentPos.lon, currentPos.lat], zoom: 15 });
         });
@@ -438,7 +445,8 @@
             destInput.value = '';
             speak("Navegación finalizada.");
             if (watchId !== null) navigator.geolocation.clearWatch(watchId);
-            if (map.getSource('route-src')) map.removeLayer('route-layer'), map.removeSource('route-src');
+            if (map.getLayer('route-layer')) map.removeLayer('route-layer');
+            if (map.getSource('route-src')) map.removeSource('route-src');
             addRadaresLayerToMap([]);
             map.easeTo({ pitch: 0, bearing: 0, duration: 800 });
         });
