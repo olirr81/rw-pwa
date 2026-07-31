@@ -3,9 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Avisador 3D - Waze Killer</title>
+    <title>Avisador Premium 3D</title>
 
-    <!-- CSS MapLibre GL JS -->
     <link href="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css" rel="stylesheet" />
     
     <style>
@@ -38,58 +37,43 @@
             box-shadow: 0 8px 32px rgba(0,0,0,0.6);
         }
 
-        .search-input {
-            flex: 1;
-            background: transparent;
-            border: none;
-            color: #fff;
-            font-size: 0.95rem;
-            padding: 8px;
-            outline: none;
-        }
-
-        .search-btn, .clear-btn, .voice-btn {
-            border: none;
-            border-radius: 10px;
-            padding: 0 12px;
-            font-weight: 800;
-            font-size: 0.85rem;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
+        .search-input { flex: 1; background: transparent; border: none; color: #fff; font-size: 0.95rem; padding: 8px; outline: none; }
+        .search-btn, .clear-btn, .icon-btn {
+            border: none; border-radius: 10px; padding: 0 12px; font-weight: 800; font-size: 0.85rem; cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
         }
         .search-btn { background: #00e5ff; color: #000; }
         .clear-btn { background: #ff3d00; color: #fff; display: none; }
-        .voice-btn { background: rgba(255,255,255,0.1); color: #00e5ff; border: 1px solid rgba(0,229,255,0.3); }
-        .voice-btn.active { background: #00e5ff; color: #000; }
+        .icon-btn { background: rgba(255,255,255,0.1); color: #00e5ff; border: 1px solid rgba(0,229,255,0.3); }
+        .icon-btn.active { background: #00e5ff; color: #000; }
 
-        .turn-card {
+        /* Menú de Configuración / Capas */
+        .settings-panel {
+            position: absolute;
+            top: 70px;
+            right: 12px;
+            z-index: 20;
             background: rgba(15, 23, 42, 0.95);
-            backdrop-filter: blur(12px);
-            border-radius: 14px;
-            padding: 10px 14px;
+            backdrop-filter: blur(16px);
+            border-radius: 16px;
+            padding: 16px;
             border: 1px solid rgba(0, 229, 255, 0.3);
+            box-shadow: 0 10px 40px rgba(0,0,0,0.8);
+            width: 260px;
             display: none;
-            align-items: center;
+            flex-direction: column;
             gap: 12px;
         }
-        .turn-icon { font-size: 1.8rem; color: #00e5ff; }
-        .turn-info { flex: 1; }
-        .turn-dist { font-size: 1.2rem; font-weight: 900; color: #00e5ff; }
-        .turn-street { font-size: 0.85rem; color: #cbd5e1; font-weight: 600; }
+        .settings-panel.open { display: flex; }
+        .settings-title { font-size: 0.9rem; font-weight: 800; color: #00e5ff; text-transform: uppercase; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 8px; }
+        .toggle-row { display: flex; justify-content: space-between; align-items: center; font-size: 0.85rem; }
+        .toggle-row input { accent-color: #00e5ff; width: 18px; height: 18px; cursor: pointer; }
 
         .hud-cards-row { display: flex; gap: 8px; }
-
         .hud-card {
-            background: rgba(20, 20, 20, 0.85);
-            backdrop-filter: blur(10px);
-            border-radius: 14px;
-            padding: 10px 14px;
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+            background: rgba(20, 20, 20, 0.85); backdrop-filter: blur(10px); border-radius: 14px; padding: 10px 14px;
+            border: 1px solid rgba(255, 255, 255, 0.1); box-shadow: 0 8px 32px rgba(0,0,0,0.5);
         }
-
         .speed-card { flex: 1; text-align: center; }
         .speed-val { font-size: 2rem; font-weight: 900; color: #00e5ff; line-height: 1; }
         .speed-unit { font-size: 0.7rem; color: #aaa; text-transform: uppercase; }
@@ -100,78 +84,19 @@
         .radar-dist-val { font-size: 1.3rem; font-weight: 900; color: #ff3d00; }
 
         /* HUD Inferior */
-        .hud-bottom {
-            position: absolute;
-            bottom: 20px;
-            left: 12px;
-            right: 12px;
-            z-index: 10;
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-        }
-
-        .btn {
-            width: 100%;
-            padding: 16px;
-            border-radius: 14px;
-            border: none;
-            font-weight: 800;
-            font-size: 1.1rem;
-            cursor: pointer;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.4);
-        }
+        .hud-bottom { position: absolute; bottom: 20px; left: 12px; right: 12px; z-index: 10; display: flex; flex-direction: column; gap: 8px; }
+        .btn { width: 100%; padding: 16px; border-radius: 14px; border: none; font-weight: 800; font-size: 1.1rem; cursor: pointer; box-shadow: 0 4px 20px rgba(0,0,0,0.4); }
         .btn-active { background: linear-gradient(135deg, #00c853, #00e676); color: #000; }
         .btn-inactive { background: linear-gradient(135deg, #d50000, #ff1744); color: #fff; }
 
         .recenter-btn {
-            position: absolute;
-            right: 12px;
-            bottom: 140px;
-            z-index: 10;
-            background: rgba(20, 20, 20, 0.9);
-            border: 1px solid rgba(255,255,255,0.2);
-            color: #00e5ff;
-            width: 44px;
-            height: 44px;
-            border-radius: 50%;
-            font-size: 1.2rem;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
-            cursor: pointer;
+            position: absolute; right: 12px; bottom: 140px; z-index: 10; background: rgba(20, 20, 20, 0.9);
+            border: 1px solid rgba(255,255,255,0.2); color: #00e5ff; width: 44px; height: 44px; border-radius: 50%;
+            font-size: 1.2rem; display: flex; align-items: center; justify-content: center; cursor: pointer;
         }
 
-        .logs-card {
-            background: rgba(0, 0, 0, 0.85);
-            backdrop-filter: blur(5px);
-            border-radius: 10px;
-            padding: 6px 10px;
-            font-family: monospace;
-            font-size: 0.65rem;
-            color: #00ff66;
-            max-height: 50px;
-            overflow-y: auto;
-            border: 1px solid rgba(255,255,255,0.05);
-        }
-
-        .user-location-marker {
-            width: 40px;
-            height: 40px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-        .user-arrow {
-            width: 0;
-            height: 0;
-            border-left: 10px solid transparent;
-            border-right: 10px solid transparent;
-            border-bottom: 24px solid #00e5ff;
-            filter: drop-shadow(0 0 10px #00e5ff);
-            transition: transform 0.2s ease;
-        }
+        .user-location-marker { width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; }
+        .user-arrow { width: 0; height: 0; border-left: 10px solid transparent; border-right: 10px solid transparent; border-bottom: 24px solid #00e5ff; filter: drop-shadow(0 0 10px #00e5ff); }
     </style>
 </head>
 <body>
@@ -181,17 +106,31 @@
 
         <div class="hud-top">
             <div class="search-box">
-                <input type="text" id="destInput" class="search-input" placeholder="🔍 Buscar destino (ej: Sitges)..." />
+                <input type="text" id="destInput" class="search-input" placeholder="🔍 Buscar destino..." />
                 <button id="searchBtn" class="search-btn">IR</button>
-                <button id="voiceToggle" class="voice-btn active">🔊</button>
+                <button id="voiceToggle" class="icon-btn active">🔊</button>
+                <button id="settingsToggle" class="icon-btn">⚙️</button>
                 <button id="clearRouteBtn" class="clear-btn">❌</button>
             </div>
 
-            <div id="turnCard" class="turn-card">
-                <div id="turnIcon" class="turn-icon">⬆️</div>
-                <div class="turn-info">
-                    <div id="turnDist" class="turn-dist">-- m</div>
-                    <div id="turnStreet" class="turn-street">Calculando ruta...</div>
+            <!-- Panel de Configuración de Capas -->
+            <div id="settingsPanel" class="settings-panel">
+                <div class="settings-title">Capas de Alerta</div>
+                <div class="toggle-row">
+                    <span>🔴 Radares de Velocidad</span>
+                    <input type="checkbox" id="layerSpeed" checked disabled />
+                </div>
+                <div class="toggle-row">
+                    <span>🟨 Foto-Rojo (Semáforos)</span>
+                    <input type="checkbox" id="layerTrafficSignals" />
+                </div>
+                <div class="toggle-row">
+                    <span>📷 Cinturón / Móvil</span>
+                    <input type="checkbox" id="layerBelt" />
+                </div>
+                <div class="toggle-row">
+                    <span>🟣 Tramos de Riesgo</span>
+                    <input type="checkbox" id="layerDanger" />
                 </div>
             </div>
 
@@ -211,7 +150,6 @@
         <button id="recenterBtn" class="recenter-btn">🎯</button>
 
         <div class="hud-bottom">
-            <div class="logs-card" id="logs">Inicializando PWA con Síntesis de Voz...\n</div>
             <button id="toggleBtn" class="btn btn-inactive">INICIAR NAVEGACIÓN 3D</button>
         </div>
     </div>
@@ -220,318 +158,94 @@
 
     <script>
         let map;
-        let isRunning = false;
-        let watchId = null;
         let radares = [];
-        let wakeLock = null;
-        let currentPos = { lat: 41.1995, lon: 1.6279 };
-        let currentHeading = 0;
-        let userMarkerElement, userMarker;
-        let activeRouteSteps = [];
-        
-        // Control de Voz sintética
-        let voiceEnabled = true;
-        let lastSpokenStepIndex = -1;
-        let lastWarnedRadarId = null;
+        let currentPos = { lat: 41.3871, lon: 2.1700 };
 
-        const speedDisplay = document.getElementById('speedDisplay');
-        const radarType = document.getElementById('radarType');
-        const radarDist = document.getElementById('radarDist');
-        const toggleBtn = document.getElementById('toggleBtn');
-        const recenterBtn = document.getElementById('recenterBtn');
-        const destInput = document.getElementById('destInput');
-        const searchBtn = document.getElementById('searchBtn');
-        const clearRouteBtn = document.getElementById('clearRouteBtn');
-        const voiceToggle = document.getElementById('voiceToggle');
-        const turnCard = document.getElementById('turnCard');
-        const turnIcon = document.getElementById('turnIcon');
-        const turnDist = document.getElementById('turnDist');
-        const turnStreet = document.getElementById('turnStreet');
+        const settingsToggle = document.getElementById('settingsToggle');
+        const settingsPanel = document.getElementById('settingsPanel');
 
-        function log(msg) {
-            const logs = document.getElementById('logs');
-            const time = new Date().toLocaleTimeString();
-            logs.innerHTML += `[${time}] ${msg}\n`;
-            logs.scrollTop = logs.scrollHeight;
-        }
+        // Controles de capa
+        const layerTrafficSignals = document.getElementById('layerTrafficSignals');
+        const layerBelt = document.getElementById('layerBelt');
+        const layerDanger = document.getElementById('layerDanger');
 
-        // --- Sistema de Voz Sintética Nativa (Web Speech API) ---
-        function speak(text) {
-            if (!voiceEnabled || !('speechSynthesis' in window)) return;
-            window.speechSynthesis.cancel(); // Cancelar locución anterior para evitar colas
-            const utterance = new SpeechSynthesisUtterance(text);
-            utterance.lang = 'es-ES';
-            utterance.rate = 1.0;
-            window.speechSynthesis.speak(utterance);
-        }
-
-        voiceToggle.addEventListener('click', () => {
-            voiceEnabled = !voiceEnabled;
-            voiceToggle.innerText = voiceEnabled ? "🔊" : "🔇";
-            voiceToggle.className = voiceEnabled ? "voice-btn active" : "voice-btn";
-            log(voiceEnabled ? "🔊 Voz activada." : "🔇 Voz silenciada.");
+        settingsToggle.addEventListener('click', () => {
+            settingsPanel.classList.toggle('open');
+            settingsToggle.classList.toggle('active');
         });
 
-        // --- 1. Inicializar Mapa ---
-        function init3DMap() {
+        function initMap() {
             map = new maplibregl.Map({
                 container: 'map',
                 style: 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json',
                 center: [currentPos.lon, currentPos.lat],
-                zoom: 16,
+                zoom: 14,
                 pitch: 60,
-                bearing: 0,
-                antialias: true
+                bearing: 0
             });
-
-            userMarkerElement = document.createElement('div');
-            userMarkerElement.className = 'user-location-marker';
-            userMarkerElement.innerHTML = '<div class="user-arrow" id="userArrow"></div>';
-            
-            userMarker = new maplibregl.Marker({ element: userMarkerElement })
-                .setLngLat([currentPos.lon, currentPos.lat])
-                .addTo(map);
 
             map.on('load', () => {
-                log("🗺️ Motor 3D listo.");
                 loadRadares();
-                initRouteLayer();
             });
-
-            map.on('click', (e) => {
-                calculateRoute(e.lngLat.lat, e.lngLat.lng);
-            });
-        }
-
-        function initRouteLayer() {
-            map.addSource('route-src', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
-
-            map.addLayer({
-                id: 'route-glow',
-                type: 'line',
-                source: 'route-src',
-                layout: { 'line-join': 'round', 'line-cap': 'round' },
-                paint: { 'line-color': '#a855f7', 'line-width': 12, 'line-opacity': 0.5, 'line-blur': 4 }
-            });
-
-            map.addLayer({
-                id: 'route-line',
-                type: 'line',
-                source: 'route-src',
-                layout: { 'line-join': 'round', 'line-cap': 'round' },
-                paint: { 'line-color': '#c084fc', 'line-width': 6 }
-            });
-        }
-
-        async function calculateRoute(destLat, destLon) {
-            log("📍 Calculando ruta...");
-            const url = `https://router.project-osrm.org/route/v1/driving/${currentPos.lon},${currentPos.lat};${destLon},${destLat}?overview=full&geometries=geojson&steps=true`;
-
-            try {
-                const res = await fetch(url);
-                const data = await res.json();
-
-                if (data.routes && data.routes.length > 0) {
-                    const route = data.routes[0];
-                    activeRouteSteps = route.legs[0].steps;
-                    lastSpokenStepIndex = -1;
-
-                    map.getSource('route-src').setData({ type: 'Feature', geometry: route.geometry });
-
-                    turnCard.style.display = 'flex';
-                    clearRouteBtn.style.display = 'block';
-                    log(`🚀 Ruta iniciada: ${(route.distance / 1000).toFixed(1)} km`);
-                    speak(`Ruta calculada. Distancia: ${(route.distance / 1000).toFixed(1)} kilómetros.`);
-                    
-                    updateTurnInstructions();
-                }
-            } catch (err) {
-                log("⚠️ Error en ruta: " + err.message);
-            }
-        }
-
-        searchBtn.addEventListener('click', async () => {
-            const query = destInput.value;
-            if (!query) return;
-
-            log(`Buscando "${query}"...`);
-            try {
-                const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}`);
-                const data = await res.json();
-
-                if (data && data.length > 0) {
-                    calculateRoute(parseFloat(data[0].lat), parseFloat(data[0].lon));
-                }
-            } catch (e) { log("⚠️ Error búsqueda."); }
-        });
-
-        clearRouteBtn.addEventListener('click', () => {
-            map.getSource('route-src').setData({ type: 'FeatureCollection', features: [] });
-            activeRouteSteps = [];
-            turnCard.style.display = 'none';
-            clearRouteBtn.style.display = 'none';
-            destInput.value = '';
-            log("Ruta cancelada.");
-            speak("Ruta cancelada.");
-        });
-
-        function updateTurnInstructions() {
-            if (activeRouteSteps.length === 0) return;
-
-            const nextStep = activeRouteSteps[0];
-            const dist = getDistance(currentPos.lat, currentPos.lon, nextStep.maneuver.location[1], nextStep.maneuver.location[0]);
-
-            turnDist.innerText = dist > 1000 ? `${(dist / 1000).toFixed(1)} km` : `${Math.round(dist)} m`;
-            turnStreet.innerText = nextStep.name || "Sigue por la vía actual";
-
-            // Avisar por voz 300m antes de la maniobra
-            if (dist < 300 && lastSpokenStepIndex !== activeRouteSteps.length) {
-                lastSpokenStepIndex = activeRouteSteps.length;
-                const streetName = nextStep.name ? `en ${nextStep.name}` : '';
-                speak(`En ${Math.round(dist)} metros, gira ${nextStep.maneuver.modifier || ''} ${streetName}`);
-            }
-
-            if (dist < 25 && activeRouteSteps.length > 1) {
-                activeRouteSteps.shift();
-            }
         }
 
         async function loadRadares() {
             try {
                 const res = await fetch('radares.json');
                 radares = await res.json();
+                updateMapFilters();
+            } catch (e) { console.error("Error cargando radares:", e); }
+        }
 
-                const geojsonRadares = {
-                    type: 'FeatureCollection',
-                    features: radares.map((r, idx) => ({
+        function updateMapFilters() {
+            // Tipos permitidos por defecto: Solo velocidad
+            const allowedTypes = ['RADAR_FIJO', 'RADAR_MOVIL', 'RADAR_TRAMO'];
+
+            if (layerTrafficSignals.checked) allowedTypes.push('FOTO_ROJO');
+            if (layerBelt.checked) allowedTypes.push('CAMARA_CINTURON');
+            if (layerDanger.checked) allowedTypes.push('ZONA_RIESGO');
+
+            const filteredGeoJSON = {
+                type: 'FeatureCollection',
+                features: radares
+                    .filter(r => allowedTypes.includes(r.tipo))
+                    .map(r => ({
                         type: 'Feature',
                         geometry: { type: 'Point', coordinates: [r.lon, r.lat] },
-                        properties: { id: idx, tipo: r.tipo, velocidad: r.velocidad }
+                        properties: { tipo: r.tipo, velocidad: r.velocidad }
                     }))
-                };
+            };
 
-                map.addSource('radares-src', { type: 'geojson', data: geojsonRadares });
+            if (map.getSource('radares-src')) {
+                map.getSource('radares-src').setData(filteredGeoJSON);
+            } else {
+                map.addSource('radares-src', { type: 'geojson', data: filteredGeoJSON });
                 map.addLayer({
                     id: 'radares-layer',
                     type: 'circle',
                     source: 'radares-src',
                     paint: {
-                        'circle-radius': 7,
-                        'circle-color': '#ff3d00',
+                        'circle-radius': 8,
+                        'circle-color': [
+                            'match', ['get', 'tipo'],
+                            'RADAR_FIJO', '#ff1744',
+                            'FOTO_ROJO', '#ffd600',
+                            'CAMARA_CINTURON', '#00e5ff',
+                            'ZONA_RIESGO', '#e040fb',
+                            '#ff1744'
+                        ],
                         'circle-stroke-width': 2,
-                        'circle-stroke-color': '#ffffff',
-                        'circle-opacity': 0.95
+                        'circle-stroke-color': '#ffffff'
                     }
                 });
-            } catch (e) { log("⚠️ Error radares: " + e.message); }
-        }
-
-        function getDistance(lat1, lon1, lat2, lon2) {
-            const R = 6371e3;
-            const φ1 = lat1 * Math.PI / 180, φ2 = lat2 * Math.PI / 180;
-            const Δφ = (lat2 - lat1) * Math.PI / 180, Δλ = (lon2 - lon1) * Math.PI / 180;
-            const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) + Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ/2) * Math.sin(Δλ/2);
-            return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-        }
-
-        function calculateBearing(lat1, lon1, lat2, lon2) {
-            const y = Math.sin((lon2 - lon1) * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180);
-            const x = Math.cos(lat1 * Math.PI / 180) * Math.sin(lat2 * Math.PI / 180) -
-                      Math.sin(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.cos((lon2 - lon1) * Math.PI / 180);
-            return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
-        }
-
-        function handlePosition(pos) {
-            const lat = pos.coords.latitude;
-            const lon = pos.coords.longitude;
-            const speedKmH = pos.coords.speed ? Math.round(pos.coords.speed * 3.6) : 0;
-            
-            speedDisplay.innerText = speedKmH;
-
-            if (pos.coords.heading !== null && !isNaN(pos.coords.heading)) {
-                currentHeading = pos.coords.heading;
-            } else if (currentPos) {
-                const distMoved = getDistance(currentPos.lat, currentPos.lon, lat, lon);
-                if (distMoved > 2) {
-                    currentHeading = calculateBearing(currentPos.lat, currentPos.lon, lat, lon);
-                }
-            }
-            currentPos = { lat, lon };
-
-            userMarker.setLngLat([lon, lat]);
-
-            map.easeTo({
-                center: [lon, lat],
-                bearing: currentHeading,
-                pitch: 60,
-                duration: 1000,
-                easing: (t) => t
-            });
-
-            updateTurnInstructions();
-
-            // Lógica Avanzada de Detección + Alerta por Voz de Radares
-            if (radares.length > 0) {
-                let minDist = Infinity;
-                let closestRadar = null;
-                let closestRadarId = null;
-
-                radares.forEach((r, idx) => {
-                    const d = getDistance(lat, lon, r.lat, r.lon);
-                    const bearingToRadar = calculateBearing(lat, lon, r.lat, r.lon);
-                    const diff = Math.abs(currentHeading - bearingToRadar);
-                    const angle = diff > 180 ? 360 - diff : diff;
-
-                    if (angle <= 60 && d < minDist) {
-                        minDist = d;
-                        closestRadar = r;
-                        closestRadarId = idx;
-                    }
-                });
-
-                if (closestRadar) {
-                    radarType.innerText = `${closestRadar.tipo} (${closestRadar.velocidad} km/h)`;
-                    radarDist.innerText = `${Math.round(minDist)} m`;
-
-                    // Alerta por Voz a menos de 800m
-                    if (minDist <= 800 && lastWarnedRadarId !== closestRadarId) {
-                        lastWarnedRadarId = closestRadarId;
-                        speak(`Atención: ${closestRadar.tipo} de ${closestRadar.velocidad} kilómetros por hora a ${Math.round(minDist)} metros.`);
-                    }
-                }
             }
         }
 
-        recenterBtn.addEventListener('click', () => {
-            map.flyTo({ center: [currentPos.lon, currentPos.lat], zoom: 16, pitch: 60, bearing: currentHeading });
+        [layerTrafficSignals, layerBelt, layerDanger].forEach(input => {
+            input.addEventListener('change', updateMapFilters);
         });
 
-        toggleBtn.addEventListener('click', () => {
-            if (!isRunning) {
-                isRunning = true;
-                toggleBtn.innerText = "DETENER NAVEGACIÓN";
-                toggleBtn.className = "btn btn-active";
-                
-                if ('wakeLock' in navigator) navigator.wakeLock.request('screen').then(w => wakeLock = w);
-                
-                speak("Navegación activada.");
-
-                watchId = navigator.geolocation.watchPosition(
-                    handlePosition,
-                    (err) => log(`⚠️ Error GPS: ${err.message}`),
-                    { enableHighAccuracy: true, maximumAge: 1000, timeout: 5000 }
-                );
-            } else {
-                isRunning = false;
-                toggleBtn.innerText = "INICIAR NAVEGACIÓN 3D";
-                toggleBtn.className = "btn btn-inactive";
-                if (wakeLock) wakeLock.release();
-                if (watchId) navigator.geolocation.clearWatch(watchId);
-                speak("Navegación detenida.");
-            }
-        });
-
-        window.addEventListener('DOMContentLoaded', init3DMap);
+        window.addEventListener('DOMContentLoaded', initMap);
     </script>
 </body>
 </html>
