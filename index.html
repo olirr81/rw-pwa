@@ -28,24 +28,18 @@
 
   <div class="card radar">
     <div>Radar más cercano</div>
-    <div id="radarInfo" style="margin-top: 5px; font-weight: bold;">--</div>
+    <div id="radarInfo" style="margin-top: 5px; font-weight: bold;">Cargando base de datos...</div>
     <div id="radarDist" style="color: #ef4444; font-size: 20px; font-weight: bold; margin-top: 5px;">-- m</div>
   </div>
 
 <script>
-  // Datos de prueba (Radares de demostración)
-  const radaresPrueba = [
-    { id: 1, lat: 41.3879, lon: 2.1699, tipo: "Radar Fijo", velocidad: 80 },
-    { id: 2, lat: 41.3900, lon: 2.1700, tipo: "Semáforo Foto", velocidad: 50 }
-  ];
-
+  let radaresBDD = [];
   let wakeLock = null;
   let ultimoAviso = 0;
 
-  // Voz de Siri / iOS
   function hablar(texto) {
     if ('speechSynthesis' in window) {
-      window.speechSynthesis.cancel(); // Detiene audios previos
+      window.speechSynthesis.cancel();
       const msg = new SpeechSynthesisUtterance(texto);
       msg.lang = 'es-ES';
       msg.rate = 1.0;
@@ -53,18 +47,16 @@
     }
   }
 
-  // Evitar que la pantalla del iPhone se apague
   async function mantenerPantallaEncendida() {
     try {
       if ('wakeLock' in navigator) {
         wakeLock = await navigator.wakeLock.request('screen');
       }
     } catch (err) {
-      console.log("WakeLock no soportado o denegado");
+      console.log("WakeLock no soportado");
     }
   }
 
-  // Cálculo de distancia en metros (Haversine)
   function calcularDistancia(lat1, lon1, lat2, lon2) {
     const R = 6371e3;
     const φ1 = lat1 * Math.PI/180;
@@ -79,12 +71,24 @@
     return Math.round(R * c);
   }
 
-  // Iniciar GPS
-  document.getElementById('btnStart').addEventListener('click', () => {
-    hablar("Avisador de radares activado");
+  // Cargar BDD de radares desde el JSON generado por Python
+  async function cargarRadares() {
+    try {
+      const resp = await fetch('radares.json');
+      if (!resp.ok) throw new Error("No se halló radares.json");
+      radaresBDD = await resp.json();
+      document.getElementById('radarInfo').innerText = `BDD Cargada (${radaresBDD.length} radares)`;
+    } catch (e) {
+      document.getElementById('radarInfo').innerText = "Esperando primera sincronización...";
+    }
+  }
+
+  document.getElementById('btnStart').addEventListener('click', async () => {
+    await cargarRadares();
+    hablar("Avisador activado con base de datos real");
     mantenerPantallaEncendida();
     
-    document.getElementById('status').innerText = "Buscando señal GPS y manteniendo pantalla encendida...";
+    document.getElementById('status').innerText = "Rastreando ubicación...";
     document.getElementById('btnStart').style.background = "#16a34a";
     document.getElementById('btnStart').innerText = "Avisador Activo";
 
@@ -96,11 +100,12 @@
 
         document.getElementById('speed').innerText = `${speed} km/h`;
 
-        // Buscar el radar más cercano
+        if (radaresBDD.length === 0) return;
+
         let radarCercano = null;
         let distMinima = Infinity;
 
-        radaresPrueba.forEach(radar => {
+        radaresBDD.forEach(radar => {
           const d = calcularDistancia(lat, lon, radar.lat, radar.lon);
           if (d < distMinima) {
             distMinima = d;
@@ -112,7 +117,6 @@
           document.getElementById('radarInfo').innerText = `${radarCercano.tipo} (${radarCercano.velocidad} km/h)`;
           document.getElementById('radarDist').innerText = `${distMinima} metros`;
 
-          // Alerta sonora si estamos a menos de 500m (con margen de 30s para no repetir continuamente)
           const ahora = Date.now();
           if (distMinima <= 500 && (ahora - ultimoAviso > 30000)) {
             hablar(`Atención, ${radarCercano.tipo} a ${radarCercano.velocidad} kilómetros por hora a ${distMinima} metros`);
@@ -120,7 +124,7 @@
           }
         }
       }, err => {
-        alert("Error al obtener GPS: Permite la localización en Safari");
+        alert("Error GPS: Permite el acceso a la ubicación");
       }, {
         enableHighAccuracy: true,
         maximumAge: 0,
@@ -128,6 +132,9 @@
       });
     }
   });
+
+  // Cargar radares en segundo plano al abrir
+  cargarRadares();
 </script>
 
 </body>
