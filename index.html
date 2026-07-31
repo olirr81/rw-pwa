@@ -90,7 +90,7 @@
         .btn-inactive { background: linear-gradient(135deg, #d50000, #ff1744); color: #fff; }
 
         .recenter-btn {
-            position: absolute; right: 12px; bottom: 140px; z-index: 10; background: rgba(20, 20, 20, 0.9);
+            position: absolute; right: 12px; bottom: 100px; z-index: 10; background: rgba(20, 20, 20, 0.9);
             border: 1px solid rgba(255,255,255,0.2); color: #00e5ff; width: 44px; height: 44px; border-radius: 50%;
             font-size: 1.2rem; display: flex; align-items: center; justify-content: center; cursor: pointer;
         }
@@ -113,7 +113,6 @@
                 <button id="clearRouteBtn" class="clear-btn">❌</button>
             </div>
 
-            <!-- Panel de Configuración de Capas -->
             <div id="settingsPanel" class="settings-panel">
                 <div class="settings-title">Capas de Alerta</div>
                 <div class="toggle-row">
@@ -141,7 +140,7 @@
                 </div>
                 <div class="hud-card radar-hud">
                     <div class="radar-title">Radar en ruta</div>
-                    <div class="radar-info" id="radarType">Buscando...</div>
+                    <div class="radar-info" id="radarType">Sin Alertas</div>
                     <div class="radar-dist-val" id="radarDist">-- m</div>
                 </div>
             </div>
@@ -159,16 +158,25 @@
     <script>
         let map;
         let radares = [];
-        let currentPos = { lat: 41.3871, lon: 2.1700 };
+        let userMarker;
+        let watchId = null;
+        let isNavigating = false;
+        let simInterval = null;
+        let currentPos = { lat: 41.3871, lon: 2.1700, heading: 0, speed: 0 };
 
         const settingsToggle = document.getElementById('settingsToggle');
         const settingsPanel = document.getElementById('settingsPanel');
+        const toggleBtn = document.getElementById('toggleBtn');
+        const recenterBtn = document.getElementById('recenterBtn');
+        const speedDisplay = document.getElementById('speedDisplay');
+        const radarType = document.getElementById('radarType');
+        const radarDist = document.getElementById('radarDist');
 
-        // Controles de capa
         const layerTrafficSignals = document.getElementById('layerTrafficSignals');
         const layerBelt = document.getElementById('layerBelt');
         const layerDanger = document.getElementById('layerDanger');
 
+        // Toggle del panel de ajustes
         settingsToggle.addEventListener('click', () => {
             settingsPanel.classList.toggle('open');
             settingsToggle.classList.toggle('active');
@@ -179,10 +187,18 @@
                 container: 'map',
                 style: 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json',
                 center: [currentPos.lon, currentPos.lat],
-                zoom: 14,
+                zoom: 15,
                 pitch: 60,
                 bearing: 0
             });
+
+            // Marcador personalizado para la posición del coche
+            const el = document.createElement('div');
+            el.className = 'user-location-marker';
+            el.innerHTML = '<div class="user-arrow" id="userArrow"></div>';
+            userMarker = new maplibregl.Marker({ element: el })
+                .setLngLat([currentPos.lon, currentPos.lat])
+                .addTo(map);
 
             map.on('load', () => {
                 loadRadares();
@@ -194,32 +210,52 @@
                 const res = await fetch('radares.json');
                 radares = await res.json();
                 updateMapFilters();
-            } catch (e) { console.error("Error cargando radares:", e); }
+            } catch (e) { 
+                console.error("Error cargando radares.json:", e); 
+            }
+        }
+
+        // Normalizar tipos (acepta "Radar Fijo" o "RADAR_FIJO")
+        function isSpeedRadar(tipo) {
+            const t = (tipo || '').toUpperCase();
+            return t.includes('FIJO') || t.includes('MOVIL') || t.includes('TRAMO') || t === 'RADAR_FIJO';
+        }
+        function isTrafficSignal(tipo) {
+            const t = (tipo || '').toUpperCase();
+            return t.includes('SEMAFORO') || t.includes('FOTO') || t === 'FOTO_ROJO';
+        }
+        function isBelt(tipo) {
+            const t = (tipo || '').toUpperCase();
+            return t.includes('CINTURON') || t.includes('CELULAR') || t === 'CAMARA_CINTURON';
         }
 
         function updateMapFilters() {
-            // Tipos permitidos por defecto: Solo velocidad
-            const allowedTypes = ['RADAR_FIJO', 'RADAR_MOVIL', 'RADAR_TRAMO'];
+            if (!radares || radares.length === 0) return;
 
-            if (layerTrafficSignals.checked) allowedTypes.push('FOTO_ROJO');
-            if (layerBelt.checked) allowedTypes.push('CAMARA_CINTURON');
-            if (layerDanger.checked) allowedTypes.push('ZONA_RIESGO');
+            const filteredFeatures = radares.filter(r => {
+                if (isSpeedRadar(r.tipo)) return true;
+                if (layerTrafficSignals.checked && isTrafficSignal(r.tipo)) return true;
+                if (layerBelt.checked && isBelt(r.tipo)) return true;
+                if (layerDanger.checked && r.tipo === 'ZONA_RIESGO') return true;
+                return false;
+            }).map(r => ({
+                type: 'Feature',
+                geometry: { type: 'Point', coordinates: [Number(r.lon), Number(r.lat)] },
+                properties: { 
+                    tipo: r.tipo, 
+                    velocidad: r.velocidad || 80 
+                }
+            }));
 
-            const filteredGeoJSON = {
+            const geojsonData = {
                 type: 'FeatureCollection',
-                features: radares
-                    .filter(r => allowedTypes.includes(r.tipo))
-                    .map(r => ({
-                        type: 'Feature',
-                        geometry: { type: 'Point', coordinates: [r.lon, r.lat] },
-                        properties: { tipo: r.tipo, velocidad: r.velocidad }
-                    }))
+                features: filteredFeatures
             };
 
             if (map.getSource('radares-src')) {
-                map.getSource('radares-src').setData(filteredGeoJSON);
+                map.getSource('radares-src').setData(geojsonData);
             } else {
-                map.addSource('radares-src', { type: 'geojson', data: filteredGeoJSON });
+                map.addSource('radares-src', { type: 'geojson', data: geojsonData });
                 map.addLayer({
                     id: 'radares-layer',
                     type: 'circle',
@@ -227,11 +263,10 @@
                     paint: {
                         'circle-radius': 8,
                         'circle-color': [
-                            'match', ['get', 'tipo'],
-                            'RADAR_FIJO', '#ff1744',
-                            'FOTO_ROJO', '#ffd600',
-                            'CAMARA_CINTURON', '#00e5ff',
-                            'ZONA_RIESGO', '#e040fb',
+                            'step',
+                            ['get', 'velocidad'],
+                            '#ffd600', 60,
+                            '#ff9100', 100,
                             '#ff1744'
                         ],
                         'circle-stroke-width': 2,
@@ -240,6 +275,113 @@
                 });
             }
         }
+
+        // Recalcular proximidad al radar más cercano
+        function checkProximity(lat, lon) {
+            if (!radares.length) return;
+            let minDist = Infinity;
+            let closestRadar = null;
+
+            radares.forEach(r => {
+                const d = getDistanceMeters(lat, lon, Number(r.lat), Number(r.lon));
+                if (d < minDist) {
+                    minDist = d;
+                    closestRadar = r;
+                }
+            });
+
+            if (closestRadar && minDist < 1000) {
+                radarType.innerText = `${closestRadar.tipo} (${closestRadar.velocidad || 80} km/h)`;
+                radarDist.innerText = `${Math.round(minDist)} m`;
+            } else {
+                radarType.innerText = "Sin Alertas";
+                radarDist.innerText = "-- m";
+            }
+        }
+
+        // Cálculo de distancia en metros (Haversine)
+        function getDistanceMeters(lat1, lon1, lat2, lon2) {
+            const R = 6371000;
+            const dLat = (lat2 - lat1) * Math.PI / 180;
+            const dLon = (lon2 - lon1) * Math.PI / 180;
+            const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                      Math.sin(dLon/2) * Math.sin(dLon/2);
+            return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+        }
+
+        // Actualizar la interfaz y la cámara según la posición del usuario
+        function updatePosition(lat, lon, speed = 0, heading = 0) {
+            currentPos = { lat, lon, speed, heading };
+            
+            userMarker.setLngLat([lon, lat]);
+            const arrow = document.getElementById('userArrow');
+            if (arrow) arrow.style.transform = `rotate(${heading}deg)`;
+
+            speedDisplay.innerText = Math.round(speed);
+            checkProximity(lat, lon);
+
+            if (isNavigating) {
+                map.easeTo({
+                    center: [lon, lat],
+                    bearing: heading,
+                    pitch: 60,
+                    zoom: 17,
+                    duration: 1000
+                });
+            }
+        }
+
+        // Simulación / Navegación GPS
+        toggleBtn.addEventListener('click', () => {
+            isNavigating = !isNavigating;
+
+            if (isNavigating) {
+                toggleBtn.innerText = "DETENER NAVEGACIÓN";
+                toggleBtn.className = "btn btn-active";
+
+                if ("geolocation" in navigator) {
+                    watchId = navigator.geolocation.watchPosition(
+                        (pos) => {
+                            const speedKmH = (pos.coords.speed || 0) * 3.6;
+                            updatePosition(
+                                pos.coords.latitude, 
+                                pos.coords.longitude, 
+                                speedKmH, 
+                                pos.coords.heading || 0
+                            );
+                        },
+                        (err) => console.warn("GPS no disponible, usando simulación:", err),
+                        { enableHighAccuracy: true }
+                    );
+                }
+
+                // Si estamos parados o probando en escritorio, arrancamos un avance de prueba
+                let simLat = currentPos.lat;
+                let simLon = currentPos.lon;
+                simInterval = setInterval(() => {
+                    simLat += 0.00005;
+                    simLon += 0.00005;
+                    updatePosition(simLat, simLon, 50, 45);
+                }, 1000);
+
+            } else {
+                toggleBtn.innerText = "INICIAR NAVEGACIÓN 3D";
+                toggleBtn.className = "btn btn-inactive";
+                if (watchId) navigator.geolocation.clearWatch(watchId);
+                if (simInterval) clearInterval(simInterval);
+                speedDisplay.innerText = "0";
+            }
+        });
+
+        recenterBtn.addEventListener('click', () => {
+            map.flyTo({
+                center: [currentPos.lon, currentPos.lat],
+                zoom: 16,
+                pitch: 60,
+                bearing: currentPos.heading
+            });
+        });
 
         [layerTrafficSignals, layerBelt, layerDanger].forEach(input => {
             input.addEventListener('change', updateMapFilters);
