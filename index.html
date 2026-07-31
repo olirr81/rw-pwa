@@ -5,19 +5,18 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Avisador Radares</title>
   
-  <!-- Configuración PWA e iOS -->
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#2563eb">
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 
   <style>
-    body { font-family: system-ui, -apple-system, sans-serif; background: #111; color: #fff; text-align: center; padding: 20px; margin: 0; }
-    h1 { font-size: 24px; margin-top: 10px; }
-    .card { background: #222; border-radius: 12px; padding: 15px; margin: 15px 0; border: 1px solid #333; }
-    button { background: #2563eb; color: white; border: none; padding: 16px 25px; font-size: 18px; border-radius: 10px; font-weight: bold; width: 100%; margin-top: 5px; cursor: pointer; }
+    body { font-family: system-ui, -apple-system, sans-serif; background: #111; color: #fff; text-align: center; padding: 15px; margin: 0; }
+    h1 { font-size: 22px; margin: 10px 0; }
+    .card { background: #222; border-radius: 12px; padding: 12px; margin: 10px 0; border: 1px solid #333; }
+    button { background: #2563eb; color: white; border: none; padding: 14px; font-size: 16px; border-radius: 10px; font-weight: bold; width: 100%; cursor: pointer; }
     .radar { border-left: 5px solid #ef4444; }
-    .big-num { font-size: 36px; font-weight: bold; color: #3b82f6; margin-top: 5px; }
+    .big-num { font-size: 32px; font-weight: bold; color: #3b82f6; margin-top: 2px; }
+    #debugConsole { background: #000; color: #00ff00; font-family: monospace; font-size: 11px; text-align: left; padding: 8px; border-radius: 8px; max-height: 120px; overflow-y: auto; white-space: pre-wrap; margin-top: 15px; border: 1px solid #444; }
   </style>
 </head>
 <body>
@@ -25,49 +24,45 @@
   <h1>Avisador de Radares</h1>
   
   <div class="card">
-    <button id="btnStart">1. Activar Avisador y GPS</button>
-    <p id="status" style="font-size: 14px; color: #aaa; margin-top: 10px;">Presiona para iniciar</p>
+    <button id="btnStart">1. Activar Avisador</button>
+    <p id="status" style="font-size: 12px; color: #aaa; margin-top: 6px;">Estado: Inactivo</p>
   </div>
 
   <div class="card">
     <div>Velocidad actual</div>
     <div id="speed" class="big-num">0 km/h</div>
+    <div id="coords" style="font-size: 11px; color: #888; margin-top: 4px;">GPS: Sin datos</div>
   </div>
 
   <div class="card radar">
     <div>Radar más cercano</div>
-    <div id="radarInfo" style="margin-top: 5px; font-weight: bold;">Cargando base de datos...</div>
+    <div id="radarInfo" style="margin-top: 5px; font-weight: bold;">Cargando BDD...</div>
     <div id="radarDist" style="color: #ef4444; font-size: 24px; font-weight: bold; margin-top: 5px;">-- m</div>
   </div>
 
+  <!-- Panel de Debugging -->
+  <div style="font-size: 12px; color: #888; text-align: left; margin-top: 15px;">Logs del sistema:</div>
+  <div id="debugConsole">Iniciando aplicación...\n</div>
+
 <script>
   let radaresBDD = [];
-  let wakeLock = null;
   let ultimoAviso = 0;
 
-  // Voz de Siri / iOS
+  function log(msg) {
+    const consoleEl = document.getElementById('debugConsole');
+    consoleEl.innerText += `[${new Date().toLocaleTimeString()}] ${msg}\n`;
+    consoleEl.scrollTop = consoleEl.scrollHeight;
+  }
+
   function hablar(texto) {
     if ('speechSynthesis' in window) {
       window.speechSynthesis.cancel();
       const msg = new SpeechSynthesisUtterance(texto);
       msg.lang = 'es-ES';
-      msg.rate = 1.0;
       window.speechSynthesis.speak(msg);
     }
   }
 
-  // Prevenir que la pantalla se apague en el coche
-  async function mantenerPantallaEncendida() {
-    try {
-      if ('wakeLock' in navigator) {
-        wakeLock = await navigator.wakeLock.request('screen');
-      }
-    } catch (err) {
-      console.log("WakeLock no soportado o denegado");
-    }
-  }
-
-  // Cálculo de distancia en metros (Haversine)
   function calcularDistancia(lat1, lon1, lat2, lon2) {
     const R = 6371e3;
     const φ1 = lat1 * Math.PI/180;
@@ -82,81 +77,81 @@
     return Math.round(R * c);
   }
 
-  // Cargar el JSON de radares generado por el script de Python
   async function cargarRadares() {
+    log("Intentando descargar radares.json...");
     try {
       const resp = await fetch('radares.json');
-      if (!resp.ok) throw new Error("No se halló radares.json");
+      if (!resp.ok) throw new Error(`HTTP Error: ${resp.status}`);
       radaresBDD = await resp.json();
-      document.getElementById('radarInfo').innerText = `BDD Cargada (${radaresBDD.length} radares)`;
+      log(`¡ÉXITO! Cargados ${radaresBDD.length} radares en memoria.`);
+      document.getElementById('radarInfo').innerText = `BDD Lista (${radaresBDD.length} radares)`;
     } catch (e) {
-      document.getElementById('radarInfo').innerText = "Sin base de datos (Ejecuta el Action en GitHub)";
+      log(`ERROR BDD: ${e.message}`);
+      document.getElementById('radarInfo').innerText = "ERROR: No se halló radares.json";
     }
   }
 
-  // Evento al pulsar el botón principal
   document.getElementById('btnStart').addEventListener('click', async () => {
-    await cargarRadares();
+    log("Botón presionado. Inicializando audio...");
     hablar("Avisador activado");
-    mantenerPantallaEncendida();
     
-    document.getElementById('status').innerText = "Rastreando ubicación en tiempo real...";
+    await cargarRadares();
+    
+    document.getElementById('status').innerText = "Rastreando GPS...";
     document.getElementById('btnStart').style.background = "#16a34a";
     document.getElementById('btnStart').innerText = "Avisador Activo";
 
     if ("geolocation" in navigator) {
+      log("Solicitando acceso a Geolocation API...");
       navigator.geolocation.watchPosition(pos => {
         const lat = pos.coords.latitude;
         const lon = pos.coords.longitude;
         const speed = pos.coords.speed ? Math.round(pos.coords.speed * 3.6) : 0;
 
         document.getElementById('speed').innerText = `${speed} km/h`;
+        document.getElementById('coords').innerText = `Lat: ${lat.toFixed(4)}, Lon: ${lon.toFixed(4)}`;
 
-        if (radaresBDD.length === 0) return;
+        if (radaresBDD.length === 0) {
+          log("AVISO GPS: Recibida posición, pero BDD radares está vacía.");
+          return;
+        }
 
         let radarCercano = null;
         let distMinima = Infinity;
 
-        // Buscar el radar más cercano
-        radaresBDD.forEach(radar => {
-          const d = calcularDistancia(lat, lon, radar.lat, radar.lon);
+        for (let i = 0; i < radaresBDD.length; i++) {
+          const r = radaresBDD[i];
+          const d = calcularDistancia(lat, lon, r.lat, r.lon);
           if (d < distMinima) {
             distMinima = d;
-            radarCercano = radar;
+            radarCercano = r;
           }
-        });
+        }
 
         if (radarCercano) {
           document.getElementById('radarInfo').innerText = `${radarCercano.tipo} (${radarCercano.velocidad} km/h)`;
-          document.getElementById('radarDist').innerText = `${distMinima} metros`;
+          document.getElementById('radarDist').innerText = `${distMinima} m`;
 
-          // Alerta sonora si estamos a 500m o menos (con margen de 30 seg entre avisos)
           const ahora = Date.now();
           if (distMinima <= 500 && (ahora - ultimoAviso > 30000)) {
-            hablar(`Atención, ${radarCercano.tipo} a ${radarCercano.velocidad} kilómetros por hora a ${distMinima} metros`);
+            log(`ALERTA: Radar a ${distMinima}m. Lanzando voz.`);
+            hablar(`Atención, ${radarCercano.tipo} a ${radarCercano.velocidad} por hora a ${distMinima} metros`);
             ultimoAviso = ahora;
           }
         }
       }, err => {
-        alert("Error de GPS: Asegúrate de permitir la ubicación en Safari");
+        log(`ERROR GPS (${err.code}): ${err.message}`);
       }, {
         enableHighAccuracy: true,
         maximumAge: 0,
         timeout: 10000
       });
+    } else {
+      log("ERROR: Tu navegador no soporta Geolocation API");
     }
   });
 
-  // Registrar Service Worker para funcionamiento Offline
-  if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-      navigator.serviceWorker.register('sw.js')
-        .then(() => console.log('Service Worker listo'))
-        .catch(err => console.log('Error SW:', err));
-    });
-  }
-
-  // Cargar radares en segundo plano al iniciar la app
+  // Intentar cargar BDD al abrir la página
   cargarRadares();
 </script>
 
