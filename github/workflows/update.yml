@@ -1,1 +1,38 @@
+name: Actualizar Base de Datos de Radares
+
+on:
+  # 1. Permite lanzar la actualización manualmente desde la web/app de GitHub (Boton "Run workflow")
+  workflow_dispatch:
+
+  # 2. Ejecución automática diaria a las 02:00 AM UTC (3:00 / 4:00 AM hora de España)
+  schedule:
+    - cron: '0 2 * * *'
+
+jobs:
+  build-and-update:
+    runs-on: ubuntu-latest
+
+    steps:
+      # Paso 1: Descargar el código del repositorio
+      - name: Check out repo
+        uses: actions/checkout@v4
+
+      # Paso 2: Configurar el entorno de Python
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      # Paso 3: Ejecutar el script que descarga, cruza y genera radares.json
+      - name: Ejecutar script de radares
+        run: python scripts/update_radares.py
+
+      # Paso 4: Hacer Commit y Push del radares.json actualizado a la rama main
+      - name: Guardar y publicar cambios
+        run: |
+          git config --global user.name "GitHub Action Bot"
+          git config --global user.email "action@github.com"
+          git add public/radares.json
+          git status
+          git diff-index --quiet HEAD || (git commit -m "bot: actualización automática BDD radares" && git push)
 
