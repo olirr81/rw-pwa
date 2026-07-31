@@ -8,95 +8,70 @@
     <link href="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css" rel="stylesheet" />
     
     <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; -webkit-tap-highlight-color: transparent; }
         body { background-color: #0d0d0d; color: #ffffff; height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
         
         #map-container { flex: 1; position: relative; width: 100%; height: 100%; }
         #map { width: 100%; height: 100%; }
 
-        /* HUD Superior */
         .hud-top {
-            position: absolute;
-            top: 12px;
-            left: 12px;
-            right: 12px;
-            z-index: 10;
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
+            position: absolute; top: 12px; left: 12px; right: 12px; z-index: 10;
+            display: flex; flex-direction: column; gap: 8px;
         }
 
         .search-box {
-            display: flex;
-            gap: 8px;
-            background: rgba(20, 20, 20, 0.9);
-            backdrop-filter: blur(12px);
-            border-radius: 14px;
-            padding: 6px 10px;
-            border: 1px solid rgba(255, 255, 255, 0.15);
-            box-shadow: 0 8px 32px rgba(0,0,0,0.6);
+            display: flex; gap: 6px; background: rgba(20, 20, 20, 0.9);
+            backdrop-filter: blur(12px); border-radius: 14px; padding: 6px 10px;
+            border: 1px solid rgba(255, 255, 255, 0.15); box-shadow: 0 8px 32px rgba(0,0,0,0.6);
         }
 
-        .search-input { flex: 1; background: transparent; border: none; color: #fff; font-size: 0.95rem; padding: 8px; outline: none; }
-        .search-btn, .clear-btn, .icon-btn {
-            border: none; border-radius: 10px; padding: 0 12px; font-weight: 800; font-size: 0.85rem; cursor: pointer;
+        .search-input { flex: 1; background: transparent; border: none; color: #fff; font-size: 0.95rem; outline: none; }
+        .search-btn, .icon-btn {
+            border: none; border-radius: 10px; padding: 8px 12px; font-weight: 800; font-size: 0.85rem; cursor: pointer;
             display: flex; align-items: center; justify-content: center;
         }
         .search-btn { background: #00e5ff; color: #000; }
-        .clear-btn { background: #ff3d00; color: #fff; display: none; }
         .icon-btn { background: rgba(255,255,255,0.1); color: #00e5ff; border: 1px solid rgba(0,229,255,0.3); }
         .icon-btn.active { background: #00e5ff; color: #000; }
 
-        /* Menú de Configuración / Capas */
         .settings-panel {
-            position: absolute;
-            top: 70px;
-            right: 12px;
-            z-index: 20;
-            background: rgba(15, 23, 42, 0.95);
-            backdrop-filter: blur(16px);
-            border-radius: 16px;
-            padding: 16px;
-            border: 1px solid rgba(0, 229, 255, 0.3);
-            box-shadow: 0 10px 40px rgba(0,0,0,0.8);
-            width: 260px;
-            display: none;
-            flex-direction: column;
-            gap: 12px;
+            position: absolute; top: 60px; right: 12px; z-index: 20;
+            background: rgba(15, 23, 42, 0.95); backdrop-filter: blur(16px);
+            border-radius: 16px; padding: 16px; border: 1px solid rgba(0, 229, 255, 0.3);
+            box-shadow: 0 10px 40px rgba(0,0,0,0.8); width: 260px; display: none; flex-direction: column; gap: 12px;
         }
         .settings-panel.open { display: flex; }
-        .settings-title { font-size: 0.9rem; font-weight: 800; color: #00e5ff; text-transform: uppercase; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 8px; }
+        .settings-title { font-size: 0.85rem; font-weight: 800; color: #00e5ff; text-transform: uppercase; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 6px; }
         .toggle-row { display: flex; justify-content: space-between; align-items: center; font-size: 0.85rem; }
-        .toggle-row input { accent-color: #00e5ff; width: 18px; height: 18px; cursor: pointer; }
+        .toggle-row input { accent-color: #00e5ff; width: 20px; height: 20px; cursor: pointer; }
 
         .hud-cards-row { display: flex; gap: 8px; }
         .hud-card {
-            background: rgba(20, 20, 20, 0.85); backdrop-filter: blur(10px); border-radius: 14px; padding: 10px 14px;
+            background: rgba(20, 20, 20, 0.85); backdrop-filter: blur(10px); border-radius: 14px; padding: 8px 12px;
             border: 1px solid rgba(255, 255, 255, 0.1); box-shadow: 0 8px 32px rgba(0,0,0,0.5);
         }
         .speed-card { flex: 1; text-align: center; }
-        .speed-val { font-size: 2rem; font-weight: 900; color: #00e5ff; line-height: 1; }
-        .speed-unit { font-size: 0.7rem; color: #aaa; text-transform: uppercase; }
+        .speed-val { font-size: 1.8rem; font-weight: 900; color: #00e5ff; line-height: 1; }
+        .speed-unit { font-size: 0.65rem; color: #aaa; text-transform: uppercase; }
 
         .radar-hud { flex: 2; border-left: 4px solid #ff3d00; display: flex; flex-direction: column; justify-content: center; }
-        .radar-title { font-size: 0.7rem; color: #aaa; text-transform: uppercase; }
-        .radar-info { font-size: 1rem; font-weight: bold; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .radar-dist-val { font-size: 1.3rem; font-weight: 900; color: #ff3d00; }
+        .radar-title { font-size: 0.65rem; color: #aaa; text-transform: uppercase; }
+        .radar-info { font-size: 0.9rem; font-weight: bold; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .radar-dist-val { font-size: 1.2rem; font-weight: 900; color: #ff3d00; }
 
-        /* HUD Inferior */
-        .hud-bottom { position: absolute; bottom: 20px; left: 12px; right: 12px; z-index: 10; display: flex; flex-direction: column; gap: 8px; }
-        .btn { width: 100%; padding: 16px; border-radius: 14px; border: none; font-weight: 800; font-size: 1.1rem; cursor: pointer; box-shadow: 0 4px 20px rgba(0,0,0,0.4); }
+        .hud-bottom { position: absolute; bottom: 24px; left: 12px; right: 12px; z-index: 10; }
+        .btn { width: 100%; padding: 16px; border-radius: 14px; border: none; font-weight: 800; font-size: 1.05rem; cursor: pointer; box-shadow: 0 4px 20px rgba(0,0,0,0.5); }
         .btn-active { background: linear-gradient(135deg, #00c853, #00e676); color: #000; }
         .btn-inactive { background: linear-gradient(135deg, #d50000, #ff1744); color: #fff; }
 
         .recenter-btn {
-            position: absolute; right: 12px; bottom: 100px; z-index: 10; background: rgba(20, 20, 20, 0.9);
-            border: 1px solid rgba(255,255,255,0.2); color: #00e5ff; width: 44px; height: 44px; border-radius: 50%;
+            position: absolute; right: 12px; bottom: 95px; z-index: 10; background: rgba(20, 20, 20, 0.9);
+            border: 1px solid rgba(255,255,255,0.2); color: #00e5ff; width: 46px; height: 46px; border-radius: 50%;
             font-size: 1.2rem; display: flex; align-items: center; justify-content: center; cursor: pointer;
         }
 
-        .user-location-marker { width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; }
-        .user-arrow { width: 0; height: 0; border-left: 10px solid transparent; border-right: 10px solid transparent; border-bottom: 24px solid #00e5ff; filter: drop-shadow(0 0 10px #00e5ff); }
+        .user-location-marker { width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; }
+        .user-arrow { width: 0; height: 0; border-left: 9px solid transparent; border-right: 9px solid transparent; border-bottom: 22px solid #00e5ff; filter: drop-shadow(0 0 8px #00e5ff); transition: transform 0.2s ease; }
     </style>
 </head>
 <body>
@@ -106,30 +81,24 @@
 
         <div class="hud-top">
             <div class="search-box">
-                <input type="text" id="destInput" class="search-input" placeholder="🔍 Buscar destino..." />
+                <input type="text" id="destInput" class="search-input" placeholder="🔍 Buscar lugar o ciudad..." />
                 <button id="searchBtn" class="search-btn">IR</button>
-                <button id="voiceToggle" class="icon-btn active">🔊</button>
                 <button id="settingsToggle" class="icon-btn">⚙️</button>
-                <button id="clearRouteBtn" class="clear-btn">❌</button>
             </div>
 
             <div id="settingsPanel" class="settings-panel">
-                <div class="settings-title">Capas de Alerta</div>
+                <div class="settings-title">Filtro de Capas</div>
                 <div class="toggle-row">
                     <span>🔴 Radares de Velocidad</span>
-                    <input type="checkbox" id="layerSpeed" checked disabled />
+                    <input type="checkbox" id="layerSpeed" checked />
                 </div>
                 <div class="toggle-row">
                     <span>🟨 Foto-Rojo (Semáforos)</span>
-                    <input type="checkbox" id="layerTrafficSignals" />
+                    <input type="checkbox" id="layerTrafficSignals" checked />
                 </div>
                 <div class="toggle-row">
                     <span>📷 Cinturón / Móvil</span>
-                    <input type="checkbox" id="layerBelt" />
-                </div>
-                <div class="toggle-row">
-                    <span>🟣 Tramos de Riesgo</span>
-                    <input type="checkbox" id="layerDanger" />
+                    <input type="checkbox" id="layerBelt" checked />
                 </div>
             </div>
 
@@ -139,7 +108,7 @@
                     <div class="speed-unit">km/h</div>
                 </div>
                 <div class="hud-card radar-hud">
-                    <div class="radar-title">Radar en ruta</div>
+                    <div class="radar-title">Alerta Próxima</div>
                     <div class="radar-info" id="radarType">Sin Alertas</div>
                     <div class="radar-dist-val" id="radarDist">-- m</div>
                 </div>
@@ -160,26 +129,27 @@
         let radares = [];
         let userMarker;
         let watchId = null;
-        let isNavigating = false;
         let simInterval = null;
+        let isNavigating = false;
         let currentPos = { lat: 41.3871, lon: 2.1700, heading: 0, speed: 0 };
 
         const settingsToggle = document.getElementById('settingsToggle');
         const settingsPanel = document.getElementById('settingsPanel');
         const toggleBtn = document.getElementById('toggleBtn');
         const recenterBtn = document.getElementById('recenterBtn');
+        const searchBtn = document.getElementById('searchBtn');
+        const destInput = document.getElementById('destInput');
         const speedDisplay = document.getElementById('speedDisplay');
         const radarType = document.getElementById('radarType');
         const radarDist = document.getElementById('radarDist');
 
+        const layerSpeed = document.getElementById('layerSpeed');
         const layerTrafficSignals = document.getElementById('layerTrafficSignals');
         const layerBelt = document.getElementById('layerBelt');
-        const layerDanger = document.getElementById('layerDanger');
 
-        // Toggle del panel de ajustes
-        settingsToggle.addEventListener('click', () => {
+        settingsToggle.addEventListener('click', (e) => {
+            e.stopPropagation();
             settingsPanel.classList.toggle('open');
-            settingsToggle.classList.toggle('active');
         });
 
         function initMap() {
@@ -187,12 +157,10 @@
                 container: 'map',
                 style: 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json',
                 center: [currentPos.lon, currentPos.lat],
-                zoom: 15,
-                pitch: 60,
-                bearing: 0
+                zoom: 14,
+                pitch: 45
             });
 
-            // Marcador personalizado para la posición del coche
             const el = document.createElement('div');
             el.className = 'user-location-marker';
             el.innerHTML = '<div class="user-arrow" id="userArrow"></div>';
@@ -200,9 +168,7 @@
                 .setLngLat([currentPos.lon, currentPos.lat])
                 .addTo(map);
 
-            map.on('load', () => {
-                loadRadares();
-            });
+            map.on('load', loadRadares);
         }
 
         async function loadRadares() {
@@ -210,111 +176,55 @@
                 const res = await fetch('radares.json');
                 radares = await res.json();
                 updateMapFilters();
-            } catch (e) { 
-                console.error("Error cargando radares.json:", e); 
+            } catch (e) {
+                console.error("Error al cargar radares.json:", e);
             }
         }
 
-        // Normalizar tipos (acepta "Radar Fijo" o "RADAR_FIJO")
-        function isSpeedRadar(tipo) {
-            const t = (tipo || '').toUpperCase();
-            return t.includes('FIJO') || t.includes('MOVIL') || t.includes('TRAMO') || t === 'RADAR_FIJO';
-        }
-        function isTrafficSignal(tipo) {
-            const t = (tipo || '').toUpperCase();
-            return t.includes('SEMAFORO') || t.includes('FOTO') || t === 'FOTO_ROJO';
-        }
-        function isBelt(tipo) {
-            const t = (tipo || '').toUpperCase();
-            return t.includes('CINTURON') || t.includes('CELULAR') || t === 'CAMARA_CINTURON';
-        }
-
         function updateMapFilters() {
-            if (!radares || radares.length === 0) return;
+            if (!radares || !radares.length) return;
 
-            const filteredFeatures = radares.filter(r => {
-                if (isSpeedRadar(r.tipo)) return true;
-                if (layerTrafficSignals.checked && isTrafficSignal(r.tipo)) return true;
-                if (layerBelt.checked && isBelt(r.tipo)) return true;
-                if (layerDanger.checked && r.tipo === 'ZONA_RIESGO') return true;
+            const features = radares.filter(r => {
+                const t = (r.tipo || '').toUpperCase();
+                if (layerSpeed.checked && (t.includes('FIJO') || t.includes('MOVIL') || t === 'RADAR_FIJO')) return true;
+                if (layerTrafficSignals.checked && (t.includes('ROJO') || t.includes('SEMAFORO') || t === 'FOTO_ROJO')) return true;
+                if (layerBelt.checked && (t.includes('CINTURON') || t === 'CAMARA_CINTURON')) return true;
                 return false;
             }).map(r => ({
                 type: 'Feature',
                 geometry: { type: 'Point', coordinates: [Number(r.lon), Number(r.lat)] },
-                properties: { 
-                    tipo: r.tipo, 
-                    velocidad: r.velocidad || 80 
-                }
+                properties: { tipo: r.tipo, vel: r.velocidad || 80 }
             }));
 
-            const geojsonData = {
-                type: 'FeatureCollection',
-                features: filteredFeatures
-            };
+            const geojson = { type: 'FeatureCollection', features };
 
             if (map.getSource('radares-src')) {
-                map.getSource('radares-src').setData(geojsonData);
+                map.getSource('radares-src').setData(geojson);
             } else {
-                map.addSource('radares-src', { type: 'geojson', data: geojsonData });
+                map.addSource('radares-src', { type: 'geojson', data: geojson });
                 map.addLayer({
                     id: 'radares-layer',
                     type: 'circle',
                     source: 'radares-src',
                     paint: {
-                        'circle-radius': 8,
+                        'circle-radius': 7,
                         'circle-color': [
-                            'step',
-                            ['get', 'velocidad'],
-                            '#ffd600', 60,
-                            '#ff9100', 100,
+                            'match', ['get', 'tipo'],
+                            'FOTO_ROJO', '#ffea00',
+                            'CAMARA_CINTURON', '#e040fb',
                             '#ff1744'
                         ],
-                        'circle-stroke-width': 2,
+                        'circle-stroke-width': 1.5,
                         'circle-stroke-color': '#ffffff'
                     }
                 });
             }
         }
 
-        // Recalcular proximidad al radar más cercano
-        function checkProximity(lat, lon) {
-            if (!radares.length) return;
-            let minDist = Infinity;
-            let closestRadar = null;
-
-            radares.forEach(r => {
-                const d = getDistanceMeters(lat, lon, Number(r.lat), Number(r.lon));
-                if (d < minDist) {
-                    minDist = d;
-                    closestRadar = r;
-                }
-            });
-
-            if (closestRadar && minDist < 1000) {
-                radarType.innerText = `${closestRadar.tipo} (${closestRadar.velocidad || 80} km/h)`;
-                radarDist.innerText = `${Math.round(minDist)} m`;
-            } else {
-                radarType.innerText = "Sin Alertas";
-                radarDist.innerText = "-- m";
-            }
-        }
-
-        // Cálculo de distancia en metros (Haversine)
-        function getDistanceMeters(lat1, lon1, lat2, lon2) {
-            const R = 6371000;
-            const dLat = (lat2 - lat1) * Math.PI / 180;
-            const dLon = (lon2 - lon1) * Math.PI / 180;
-            const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-                      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-                      Math.sin(dLon/2) * Math.sin(dLon/2);
-            return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-        }
-
-        // Actualizar la interfaz y la cámara según la posición del usuario
         function updatePosition(lat, lon, speed = 0, heading = 0) {
             currentPos = { lat, lon, speed, heading };
-            
             userMarker.setLngLat([lon, lat]);
+            
             const arrow = document.getElementById('userArrow');
             if (arrow) arrow.style.transform = `rotate(${heading}deg)`;
 
@@ -326,13 +236,62 @@
                     center: [lon, lat],
                     bearing: heading,
                     pitch: 60,
-                    zoom: 17,
-                    duration: 1000
+                    zoom: 16.5,
+                    duration: 800
                 });
             }
         }
 
-        // Simulación / Navegación GPS
+        function checkProximity(lat, lon) {
+            if (!radares.length) return;
+            let minDist = Infinity;
+            let closest = null;
+
+            for (let i = 0; i < radares.length; i++) {
+                const r = radares[i];
+                const d = getDistanceMeters(lat, lon, Number(r.lat), Number(r.lon));
+                if (d < minDist) {
+                    minDist = d;
+                    closest = r;
+                }
+            }
+
+            if (closest && minDist < 1200) {
+                radarType.innerText = `${closest.tipo.replace('_', ' ')} (${closest.velocidad || 80} km/h)`;
+                radarDist.innerText = `${Math.round(minDist)} m`;
+            } else {
+                radarType.innerText = "Sin Alertas";
+                radarDist.innerText = "-- m";
+            }
+        }
+
+        function getDistanceMeters(lat1, lon1, lat2, lon2) {
+            const R = 6371000;
+            const dLat = (lat2 - lat1) * Math.PI / 180;
+            const dLon = (lon2 - lon1) * Math.PI / 180;
+            const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                      Math.sin(dLon/2) * Math.sin(dLon/2);
+            return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+        }
+
+        // Búsqueda de destinos (Nominatim Geocoding)
+        searchBtn.addEventListener('click', async () => {
+            const query = destInput.value;
+            if (!query) return;
+            try {
+                const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}`);
+                const data = await res.json();
+                if (data && data.length > 0) {
+                    const top = data[0];
+                    map.flyTo({ center: [parseFloat(top.lon), parseFloat(top.lat)], zoom: 14 });
+                } else {
+                    alert("Destino no encontrado");
+                }
+            } catch (e) { console.error(e); }
+        });
+
+        // Botón Navegación
         toggleBtn.addEventListener('click', () => {
             isNavigating = !isNavigating;
 
@@ -340,29 +299,25 @@
                 toggleBtn.innerText = "DETENER NAVEGACIÓN";
                 toggleBtn.className = "btn btn-active";
 
+                // Intenta usar GPS real si existe
                 if ("geolocation" in navigator) {
                     watchId = navigator.geolocation.watchPosition(
                         (pos) => {
-                            const speedKmH = (pos.coords.speed || 0) * 3.6;
-                            updatePosition(
-                                pos.coords.latitude, 
-                                pos.coords.longitude, 
-                                speedKmH, 
-                                pos.coords.heading || 0
-                            );
+                            const spd = (pos.coords.speed || 0) * 3.6;
+                            updatePosition(pos.coords.latitude, pos.coords.longitude, spd, pos.coords.heading || 0);
                         },
-                        (err) => console.warn("GPS no disponible, usando simulación:", err),
+                        (err) => console.warn("GPS error/denegado:", err),
                         { enableHighAccuracy: true }
                     );
                 }
 
-                // Si estamos parados o probando en escritorio, arrancamos un avance de prueba
+                // Simulación para pruebas
                 let simLat = currentPos.lat;
                 let simLon = currentPos.lon;
                 simInterval = setInterval(() => {
-                    simLat += 0.00005;
-                    simLon += 0.00005;
-                    updatePosition(simLat, simLon, 50, 45);
+                    simLat += 0.00004;
+                    simLon += 0.00004;
+                    updatePosition(simLat, simLon, 65, 42);
                 }, 1000);
 
             } else {
@@ -375,19 +330,12 @@
         });
 
         recenterBtn.addEventListener('click', () => {
-            map.flyTo({
-                center: [currentPos.lon, currentPos.lat],
-                zoom: 16,
-                pitch: 60,
-                bearing: currentPos.heading
-            });
+            map.flyTo({ center: [currentPos.lon, currentPos.lat], zoom: 16, pitch: 60 });
         });
 
-        [layerTrafficSignals, layerBelt, layerDanger].forEach(input => {
-            input.addEventListener('change', updateMapFilters);
-        });
+        [layerSpeed, layerTrafficSignals, layerBelt].forEach(el => el.addEventListener('change', updateMapFilters));
 
-        window.addEventListener('DOMContentLoaded', initMap);
+        window.addEventListener('load', initMap);
     </script>
 </body>
 </html>
