@@ -27,7 +27,6 @@
             gap: 8px;
         }
 
-        /* Searchbar Destino */
         .search-box {
             display: flex;
             gap: 8px;
@@ -49,26 +48,29 @@
             outline: none;
         }
 
-        .search-btn, .clear-btn {
-            background: #00e5ff;
-            color: #000;
+        .search-btn, .clear-btn, .voice-btn {
             border: none;
             border-radius: 10px;
-            padding: 0 14px;
+            padding: 0 12px;
             font-weight: 800;
             font-size: 0.85rem;
             cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
+        .search-btn { background: #00e5ff; color: #000; }
         .clear-btn { background: #ff3d00; color: #fff; display: none; }
+        .voice-btn { background: rgba(255,255,255,0.1); color: #00e5ff; border: 1px solid rgba(0,229,255,0.3); }
+        .voice-btn.active { background: #00e5ff; color: #000; }
 
-        /* Indicación Turn-by-Turn */
         .turn-card {
             background: rgba(15, 23, 42, 0.95);
             backdrop-filter: blur(12px);
             border-radius: 14px;
             padding: 10px 14px;
             border: 1px solid rgba(0, 229, 255, 0.3);
-            display: none; /* Se activa cuando hay ruta */
+            display: none;
             align-items: center;
             gap: 12px;
         }
@@ -177,16 +179,14 @@
     <div id="map-container">
         <div id="map"></div>
 
-        <!-- HUD Superior -->
         <div class="hud-top">
-            <!-- Buscador de Destino -->
             <div class="search-box">
                 <input type="text" id="destInput" class="search-input" placeholder="🔍 Buscar destino (ej: Sitges)..." />
                 <button id="searchBtn" class="search-btn">IR</button>
+                <button id="voiceToggle" class="voice-btn active">🔊</button>
                 <button id="clearRouteBtn" class="clear-btn">❌</button>
             </div>
 
-            <!-- Panel de Giro (Turn-by-Turn) -->
             <div id="turnCard" class="turn-card">
                 <div id="turnIcon" class="turn-icon">⬆️</div>
                 <div class="turn-info">
@@ -208,12 +208,10 @@
             </div>
         </div>
 
-        <!-- Botón Re-centrar -->
         <button id="recenterBtn" class="recenter-btn">🎯</button>
 
-        <!-- HUD Inferior -->
         <div class="hud-bottom">
-            <div class="logs-card" id="logs">Iniciando GPS & Motor de Rutas 3D...\n</div>
+            <div class="logs-card" id="logs">Inicializando PWA con Síntesis de Voz...\n</div>
             <button id="toggleBtn" class="btn btn-inactive">INICIAR NAVEGACIÓN 3D</button>
         </div>
     </div>
@@ -226,10 +224,15 @@
         let watchId = null;
         let radares = [];
         let wakeLock = null;
-        let currentPos = { lat: 41.1995, lon: 1.6279 }; // Posición inicial por defecto (Cunit)
+        let currentPos = { lat: 41.1995, lon: 1.6279 };
         let currentHeading = 0;
         let userMarkerElement, userMarker;
         let activeRouteSteps = [];
+        
+        // Control de Voz sintética
+        let voiceEnabled = true;
+        let lastSpokenStepIndex = -1;
+        let lastWarnedRadarId = null;
 
         const speedDisplay = document.getElementById('speedDisplay');
         const radarType = document.getElementById('radarType');
@@ -239,6 +242,7 @@
         const destInput = document.getElementById('destInput');
         const searchBtn = document.getElementById('searchBtn');
         const clearRouteBtn = document.getElementById('clearRouteBtn');
+        const voiceToggle = document.getElementById('voiceToggle');
         const turnCard = document.getElementById('turnCard');
         const turnIcon = document.getElementById('turnIcon');
         const turnDist = document.getElementById('turnDist');
@@ -251,7 +255,24 @@
             logs.scrollTop = logs.scrollHeight;
         }
 
-        // --- 1. Inicializar Mapa 3D ---
+        // --- Sistema de Voz Sintética Nativa (Web Speech API) ---
+        function speak(text) {
+            if (!voiceEnabled || !('speechSynthesis' in window)) return;
+            window.speechSynthesis.cancel(); // Cancelar locución anterior para evitar colas
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.lang = 'es-ES';
+            utterance.rate = 1.0;
+            window.speechSynthesis.speak(utterance);
+        }
+
+        voiceToggle.addEventListener('click', () => {
+            voiceEnabled = !voiceEnabled;
+            voiceToggle.innerText = voiceEnabled ? "🔊" : "🔇";
+            voiceToggle.className = voiceEnabled ? "voice-btn active" : "voice-btn";
+            log(voiceEnabled ? "🔊 Voz activada." : "🔇 Voz silenciada.");
+        });
+
+        // --- 1. Inicializar Mapa ---
         function init3DMap() {
             map = new maplibregl.Map({
                 container: 'map',
@@ -272,54 +293,38 @@
                 .addTo(map);
 
             map.on('load', () => {
-                log("🗺️ Mapa 3D preparado.");
+                log("🗺️ Motor 3D listo.");
                 loadRadares();
                 initRouteLayer();
             });
 
-            // Permitir hacer click en el mapa para fijar destino directamente
             map.on('click', (e) => {
                 calculateRoute(e.lngLat.lat, e.lngLat.lng);
             });
         }
 
-        // --- 2. Capas de Ruta (Glow / Neón) ---
         function initRouteLayer() {
-            map.addSource('route-src', {
-                type: 'geojson',
-                data: { type: 'FeatureCollection', features: [] }
-            });
+            map.addSource('route-src', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
 
-            // Sombra / Resplandor Neón
             map.addLayer({
                 id: 'route-glow',
                 type: 'line',
                 source: 'route-src',
                 layout: { 'line-join': 'round', 'line-cap': 'round' },
-                paint: {
-                    'line-color': '#a855f7',
-                    'line-width': 12,
-                    'line-opacity': 0.5,
-                    'line-blur': 4
-                }
+                paint: { 'line-color': '#a855f7', 'line-width': 12, 'line-opacity': 0.5, 'line-blur': 4 }
             });
 
-            // Línea principal de ruta
             map.addLayer({
                 id: 'route-line',
                 type: 'line',
                 source: 'route-src',
                 layout: { 'line-join': 'round', 'line-cap': 'round' },
-                paint: {
-                    'line-color': '#c084fc',
-                    'line-width': 6
-                }
+                paint: { 'line-color': '#c084fc', 'line-width': 6 }
             });
         }
 
-        // --- 3. Calcular Ruta con OSRM API ---
         async function calculateRoute(destLat, destLon) {
-            log("📍 Calculando ruta a destino...");
+            log("📍 Calculando ruta...");
             const url = `https://router.project-osrm.org/route/v1/driving/${currentPos.lon},${currentPos.lat};${destLon},${destLat}?overview=full&geometries=geojson&steps=true`;
 
             try {
@@ -329,25 +334,22 @@
                 if (data.routes && data.routes.length > 0) {
                     const route = data.routes[0];
                     activeRouteSteps = route.legs[0].steps;
+                    lastSpokenStepIndex = -1;
 
-                    // Dibujar la ruta en el mapa
-                    map.getSource('route-src').setData({
-                        type: 'Feature',
-                        geometry: route.geometry
-                    });
+                    map.getSource('route-src').setData({ type: 'Feature', geometry: route.geometry });
 
                     turnCard.style.display = 'flex';
                     clearRouteBtn.style.display = 'block';
-                    log(`🚀 Ruta calculada: ${(route.distance / 1000).toFixed(1)} km`);
+                    log(`🚀 Ruta iniciada: ${(route.distance / 1000).toFixed(1)} km`);
+                    speak(`Ruta calculada. Distancia: ${(route.distance / 1000).toFixed(1)} kilómetros.`);
                     
                     updateTurnInstructions();
                 }
             } catch (err) {
-                log("⚠️ Error calculando ruta: " + err.message);
+                log("⚠️ Error en ruta: " + err.message);
             }
         }
 
-        // --- 4. Buscar por Nombre de Ciudad / Calle (Nominatim Free) ---
         searchBtn.addEventListener('click', async () => {
             const query = destInput.value;
             if (!query) return;
@@ -358,14 +360,9 @@
                 const data = await res.json();
 
                 if (data && data.length > 0) {
-                    const target = data[0];
-                    calculateRoute(parseFloat(target.lat), parseFloat(target.lon));
-                } else {
-                    log("❌ No se encontró la ubicación.");
+                    calculateRoute(parseFloat(data[0].lat), parseFloat(data[0].lon));
                 }
-            } catch (e) {
-                log("⚠️ Error en búsqueda.");
-            }
+            } catch (e) { log("⚠️ Error búsqueda."); }
         });
 
         clearRouteBtn.addEventListener('click', () => {
@@ -375,9 +372,9 @@
             clearRouteBtn.style.display = 'none';
             destInput.value = '';
             log("Ruta cancelada.");
+            speak("Ruta cancelada.");
         });
 
-        // --- 5. Actualizar Instrucciones Turn-by-Turn ---
         function updateTurnInstructions() {
             if (activeRouteSteps.length === 0) return;
 
@@ -387,27 +384,18 @@
             turnDist.innerText = dist > 1000 ? `${(dist / 1000).toFixed(1)} km` : `${Math.round(dist)} m`;
             turnStreet.innerText = nextStep.name || "Sigue por la vía actual";
 
-            // Asignar icono según tipo de maniobra
-            const type = nextStep.maneuver.type;
-            const modifier = nextStep.maneuver.modifier;
-
-            if (type.includes('turn')) {
-                if (modifier && modifier.includes('right')) turnIcon.innerText = '↗️';
-                else if (modifier && modifier.includes('left')) turnIcon.innerText = '↖️';
-                else turnIcon.innerText = '⬆️';
-            } else if (type.includes('roundabout')) {
-                turnIcon.innerText = '🔄';
-            } else {
-                turnIcon.innerText = '⬆️';
+            // Avisar por voz 300m antes de la maniobra
+            if (dist < 300 && lastSpokenStepIndex !== activeRouteSteps.length) {
+                lastSpokenStepIndex = activeRouteSteps.length;
+                const streetName = nextStep.name ? `en ${nextStep.name}` : '';
+                speak(`En ${Math.round(dist)} metros, gira ${nextStep.maneuver.modifier || ''} ${streetName}`);
             }
 
-            // Si estamos a menos de 25m de la maniobra, pasar a la siguiente
             if (dist < 25 && activeRouteSteps.length > 1) {
                 activeRouteSteps.shift();
             }
         }
 
-        // --- 6. Cargar Radares ---
         async function loadRadares() {
             try {
                 const res = await fetch('radares.json');
@@ -415,10 +403,10 @@
 
                 const geojsonRadares = {
                     type: 'FeatureCollection',
-                    features: radares.map(r => ({
+                    features: radares.map((r, idx) => ({
                         type: 'Feature',
                         geometry: { type: 'Point', coordinates: [r.lon, r.lat] },
-                        properties: { tipo: r.tipo, velocidad: r.velocidad }
+                        properties: { id: idx, tipo: r.tipo, velocidad: r.velocidad }
                     }))
                 };
 
@@ -435,12 +423,9 @@
                         'circle-opacity': 0.95
                     }
                 });
-            } catch (e) {
-                log("⚠️ Error radares: " + e.message);
-            }
+            } catch (e) { log("⚠️ Error radares: " + e.message); }
         }
 
-        // --- 7. Utilitarios de Distancia y Rumbo ---
         function getDistance(lat1, lon1, lat2, lon2) {
             const R = 6371e3;
             const φ1 = lat1 * Math.PI / 180, φ2 = lat2 * Math.PI / 180;
@@ -456,7 +441,6 @@
             return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
         }
 
-        // --- 8. Tracking GPS ---
         function handlePosition(pos) {
             const lat = pos.coords.latitude;
             const lon = pos.coords.longitude;
@@ -486,12 +470,13 @@
 
             updateTurnInstructions();
 
-            // Filtrar radares cercanos
+            // Lógica Avanzada de Detección + Alerta por Voz de Radares
             if (radares.length > 0) {
                 let minDist = Infinity;
                 let closestRadar = null;
+                let closestRadarId = null;
 
-                radares.forEach(r => {
+                radares.forEach((r, idx) => {
                     const d = getDistance(lat, lon, r.lat, r.lon);
                     const bearingToRadar = calculateBearing(lat, lon, r.lat, r.lon);
                     const diff = Math.abs(currentHeading - bearingToRadar);
@@ -500,12 +485,19 @@
                     if (angle <= 60 && d < minDist) {
                         minDist = d;
                         closestRadar = r;
+                        closestRadarId = idx;
                     }
                 });
 
                 if (closestRadar) {
                     radarType.innerText = `${closestRadar.tipo} (${closestRadar.velocidad} km/h)`;
                     radarDist.innerText = `${Math.round(minDist)} m`;
+
+                    // Alerta por Voz a menos de 800m
+                    if (minDist <= 800 && lastWarnedRadarId !== closestRadarId) {
+                        lastWarnedRadarId = closestRadarId;
+                        speak(`Atención: ${closestRadar.tipo} de ${closestRadar.velocidad} kilómetros por hora a ${Math.round(minDist)} metros.`);
+                    }
                 }
             }
         }
@@ -514,7 +506,6 @@
             map.flyTo({ center: [currentPos.lon, currentPos.lat], zoom: 16, pitch: 60, bearing: currentHeading });
         });
 
-        // Toggle Navegación
         toggleBtn.addEventListener('click', () => {
             if (!isRunning) {
                 isRunning = true;
@@ -523,6 +514,8 @@
                 
                 if ('wakeLock' in navigator) navigator.wakeLock.request('screen').then(w => wakeLock = w);
                 
+                speak("Navegación activada.");
+
                 watchId = navigator.geolocation.watchPosition(
                     handlePosition,
                     (err) => log(`⚠️ Error GPS: ${err.message}`),
@@ -534,6 +527,7 @@
                 toggleBtn.className = "btn btn-inactive";
                 if (wakeLock) wakeLock.release();
                 if (watchId) navigator.geolocation.clearWatch(watchId);
+                speak("Navegación detenida.");
             }
         });
 
