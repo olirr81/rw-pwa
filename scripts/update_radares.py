@@ -1,92 +1,80 @@
 import json
-import os
 import urllib.request
-import urllib.parse
+import math
 
-def fetch_osm_speed_cameras():
-    print("🤖 Consultando OpenStreetMap (Overpass API)...")
-    
-    # Consulta Overpass optimizada para radares en España
-    overpass_query = """
+# Cargar configuración
+with open('config_paises.json', 'r', encoding='utf-8') as f:
+    config = json.load(f)
+
+paises = config.get("paises_activos", ["ES"])
+print(f"🌍 Generando Base de Datos Premium para países: {', '.join(paises)}...")
+
+# Bounding boxes aproximadas por país para consultas Overpass OSM
+BBOX_PAISES = {
+    "ES": "35.0,-10.0,44.0,4.5",
+    "AND": "42.4,1.4,42.7,1.8",
+    "FR": "41.3,-5.2,51.1,9.6",
+    "DE": "47.2,5.8,55.1,15.1",
+    "IT": "36.6,6.6,47.1,18.8",
+    "CH": "45.8,5.9,47.8,10.5",
+    "AT": "46.3,9.5,49.0,17.2"
+}
+
+elementos_totales = []
+
+def consultar_overpass(bbox_str):
+    overpass_url = "https://overpass-api.de/api/interpreter"
+    query = f"""
     [out:json][timeout:60];
     (
-      node["highway"="speed_camera"](35.0,-10.0,44.0,5.0);
-      node["enforcement"="maxspeed"](35.0,-10.0,44.0,5.0);
+      node["highway"="speed_camera"]({bbox_str});
+      node["enforcement"="maxspeed"]({bbox_str});
+      node["highway"="traffic_signals"]["camera"]({bbox_str});
     );
     out body;
     """
-    
-    endpoints = [
-        "https://overpass-api.de/api/interpreter",
-        "https://overpass.kumi.systems/api/interpreter"
-    ]
-    
-    elements = []
-    encoded_data = urllib.parse.urlencode({'data': overpass_query}).encode('utf-8')
-    
-    for url in endpoints:
-        try:
-            req = urllib.request.Request(url, data=encoded_data, headers={'User-Agent': 'RadarPWA/1.0'})
-            with urllib.request.urlopen(req, timeout=60) as response:
-                if response.status == 200:
-                    data = json.loads(response.read().decode('utf-8'))
-                    elements = data.get('elements', [])
-                    if elements:
-                        print(f"✅ Descargados {len(elements)} radares desde {url}")
-                        break
-        except Exception as e:
-            print(f"⚠️ Falló el servidor {url}: {e}")
-            continue
+    req = urllib.request.Request(overpass_url, data=query.encode('utf-8'), headers={'User-Agent': 'RadarPWA/2.0'})
+    try:
+        with urllib.request.urlopen(req) as response:
+            data = json.loads(response.read().decode('utf-8'))
+            return data.get('elements', [])
+    except Exception as e:
+        print(f"⚠️ Error al consultar Overpass para bbox {bbox_str}: {e}")
+        return []
 
-    radares = []
-    for elem in elements:
-        lat = elem.get('lat')
-        lon = elem.get('lon')
-        tags = elem.get('tags', {})
-        
-        if lat and lon:
-            maxspeed = tags.get('maxspeed', None)
+for p in paises:
+    if p in BBOX_PAISES:
+        print(f"📡 Descargando datos de {p}...")
+        nodes = consultar_overpass(BBOX_PAISES[p])
+        for node in nodes:
+            tags = node.get('tags', {})
+            
+            # Clasificación inteligente de categorías
+            tipo = "RADAR_FIJO"
+            if tags.get('highway') == 'traffic_signals' or tags.get('enforcement') == 'traffic_signals':
+                tipo = "FOTO_ROJO"
+            elif tags.get('camera:type') == 'belt' or tags.get('camera:type') == 'phone':
+                tipo = "CAMARA_CINTURON"
+
+            vel = tags.get('maxspeed', '80')
             try:
-                speed = int(maxspeed) if maxspeed and str(maxspeed).isdigit() else 80
-            except ValueError:
-                speed = 80
+                vel = int(''.join(filter(str.isdigit, str(vel))))
+            except:
+                vel = 80
 
-            tipo_desc = "Radar Fijo"
-            if tags.get('enforcement') == 'maxspeed':
-                tipo_desc = "Radar de Tramo / Fijo"
-
-            radares.append({
-                "id": str(elem.get('id')),
-                "lat": round(float(lat), 6),
-                "lon": round(float(lon), 6),
-                "tipo": tipo_desc,
-                "velocidad": speed
+            elementos_totales.append({
+                "id": f"{p}-{node['id']}",
+                "pais": p,
+                "lat": node['lat'],
+                "lon": node['lon'],
+                "tipo": tipo,
+                "velocidad": vel
             })
-            
-    return radares
 
-def main():
-    radares = fetch_osm_speed_cameras()
-    
-    if not radares:
-        print("⚠️ No se pudieron descargar radares de la API. Generando fallback...")
-        radares = [
-            {"id": "demo1", "lat": 41.3851, "lon": 2.1734, "tipo": "Radar Fijo", "velocidad": 80},
-            {"id": "demo2", "lat": 41.1995, "lon": 1.6280, "tipo": "Radar Fijo", "velocidad": 120}
-        ]
+print(f"✅ Descargados {len(elementos_totales)} puntos totales.")
 
-    # Asignar IDs limpios
-    for idx, r in enumerate(radares, 1):
-        r['id'] = idx
+# Guardar fichero maestro
+with open('radares.json', 'w', encoding='utf-8') as f:
+    json.dump(elementos_totales, f, ensure_ascii=False, indent=2)
 
-    # Crear directorios y guardar JSON
-    os.makedirs("public", exist_ok=True)
-    
-    for path in ["radares.json", "public/radares.json"]:
-        with open(path, "w", encoding="utf-8") as f:
-            json.dump(radares, f, ensure_ascii=False, indent=2)
-            
-    print(f"🚀 ¡Éxito! Base de datos final guardada con {len(radares)} radares.")
-
-if __name__ == "__main__":
-    main()
+print("🚀 'radares.json' generado con éxito!")
