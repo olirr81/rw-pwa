@@ -1,0 +1,30 @@
+name: Actualizar Base de Datos de Radares
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 2 * * *'
+
+jobs:
+  build-and-update:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Ejecutar script de radares
+        run: python scripts/update_radares.py
+
+      - name: Guardar y publicar cambios
+        run: |
+          git config --global user.name "GitHub Action Bot"
+          git config --global user.email "action@github.com"
+          git add radares.json public/radares.json 2>/dev/null || true
+          git status
+          git diff-index --quiet HEAD || (git commit -m "bot: actualización automática BDD radares" && git push)
