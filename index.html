@@ -14,7 +14,6 @@
         #map-container { flex: 1; position: relative; width: 100%; height: 100%; }
         #map { width: 100%; height: 100%; }
 
-        /* HUD Superior (Velocidad y Alertas) */
         .hud-top {
             position: absolute; top: 12px; left: 12px; right: 12px; z-index: 10;
             display: flex; flex-direction: column; gap: 8px; pointer-events: none;
@@ -33,13 +32,12 @@
         .radar-info { font-size: 0.85rem; font-weight: bold; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .radar-dist-val { font-size: 1.1rem; font-weight: 900; color: #ff3d00; }
 
-        /* Buscador Estilo Waze (Inferior Flotante) */
         .search-sheet {
             position: absolute; bottom: 0; left: 0; right: 0; z-index: 20;
             background: rgba(20, 20, 20, 0.95); backdrop-filter: blur(20px);
             border-top-left-radius: 24px; border-top-right-radius: 24px;
             padding: 20px 16px 34px 16px; border: 1px solid rgba(255, 255, 255, 0.15);
-            box-shadow: 0 -10px 40px rgba(0,0,0,0.8); transition: transform 0.3s ease;
+            box-shadow: 0 -10px 40px rgba(0,0,0,0.8);
         }
         .sheet-handle { width: 40px; height: 4px; background: rgba(255,255,255,0.3); border-radius: 2px; margin: 0 auto 16px auto; }
         
@@ -57,7 +55,6 @@
         }
         .search-result-item:hover { background: rgba(0,229,255,0.15); border-color: rgba(0,229,255,0.3); }
 
-        /* Panel de Previsualización de Ruta */
         .route-preview-sheet {
             position: absolute; bottom: 0; left: 0; right: 0; z-index: 25;
             background: rgba(18, 24, 38, 0.98); backdrop-filter: blur(20px);
@@ -173,11 +170,9 @@
         const radarDist = document.getElementById('radarDist');
         const recenterBtn = document.getElementById('recenterBtn');
 
-        // Cargar voces en español de forma robusta
         function loadVoices() {
             if (!('speechSynthesis' in window)) return;
             const voices = window.speechSynthesis.getVoices();
-            // Buscar una voz en castellano (España o general)
             spanishVoice = voices.find(v => v.lang === 'es-ES' || v.lang === 'es_ES') || 
                            voices.find(v => v.lang.startsWith('es')) || 
                            voices[0];
@@ -192,9 +187,7 @@
             if ('speechSynthesis' in window) {
                 window.speechSynthesis.cancel();
                 const utterance = new SpeechSynthesisUtterance(text);
-                if (spanishVoice) {
-                    utterance.voice = spanishVoice;
-                }
+                if (spanishVoice) utterance.voice = spanishVoice;
                 utterance.lang = 'es-ES';
                 utterance.rate = 1.05;
                 window.speechSynthesis.speak(utterance);
@@ -219,8 +212,9 @@
 
             map.on('dragstart', () => { userTracking = false; });
 
-            map.on('load', () => {
-                loadRadarIconAndData();
+            map.on('load', async () => {
+                await loadRadaresData();
+                loadRadarIcon();
                 initRealGPS();
             });
         }
@@ -238,7 +232,18 @@
             }
         }
 
-        function loadRadarIconAndData() {
+        async function loadRadaresData() {
+            try {
+                const res = await fetch('radares.json?v=' + new Date().getTime());
+                radares = await res.json();
+                console.log("Radares cargados con éxito:", radares.length);
+            } catch (e) {
+                console.error("Error al cargar radares.json:", e);
+                radares = [];
+            }
+        }
+
+        function loadRadarIcon() {
             const svgIcon = `
                 <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24">
                     <circle cx="12" cy="12" r="11" fill="#141414" stroke="#ff3d00" stroke-width="2.5"/>
@@ -254,35 +259,33 @@
                 if (!map.hasImage('radar-icon')) {
                     map.addImage('radar-icon', image);
                 }
-                loadRadares();
+                addRadaresLayerToMap();
             });
         }
 
-        async function loadRadares() {
-            try {
-                const res = await fetch('radares.json?v=' + new Date().getTime());
-                radares = await res.json();
-                
-                const features = radares.map(r => ({
-                    type: 'Feature',
-                    geometry: { type: 'Point', coordinates: [parseFloat(r.lon), parseFloat(r.lat)] },
-                    properties: { tipo: r.tipo || 'RADAR_FIJO', vel: r.velocidad || 80 }
-                }));
+        function addRadaresLayerToMap() {
+            if (!radares.length) return;
+            const features = radares.map(r => ({
+                type: 'Feature',
+                geometry: { type: 'Point', coordinates: [parseFloat(r.lon), parseFloat(r.lat)] },
+                properties: { tipo: r.tipo || 'RADAR_FIJO', vel: r.velocidad || 80 }
+            }));
 
+            if (map.getSource('radares-src')) {
+                map.getSource('radares-src').setData({ type: 'FeatureCollection', features });
+            } else {
                 map.addSource('radares-src', { type: 'geojson', data: { type: 'FeatureCollection', features } });
-                
                 map.addLayer({
                     id: 'radares-layer',
                     type: 'symbol',
                     source: 'radares-src',
-                    minzoom: 11, // <-- CLAVE: Solo se muestran a partir de zoom 11 para evitar saturar Europa entera
                     layout: {
                         'icon-image': 'radar-icon',
                         'icon-size': 0.85,
                         'icon-allow-overlap': true
                     }
                 });
-            } catch (e) { console.error(e); }
+            }
         }
 
         destInput.addEventListener('input', async (e) => {
@@ -324,7 +327,7 @@
             routeRadaresCount.innerText = "Analizando radares en el camino...";
             routePreviewSheet.style.display = 'flex';
 
-            map.flyTo({ center: [selectedDestination.lon, selectedDestination.lat], zoom: 12, pitch: 0 });
+            map.flyTo({ center: [selectedDestination.lon, selectedDestination.lat], zoom: 8, pitch: 0 });
 
             try {
                 const url = `https://router.project-osrm.org/route/v1/driving/${currentPos.lon},${currentPos.lat};${selectedDestination.lon},${selectedDestination.lat}?overview=full&geometries=geojson`;
@@ -354,11 +357,12 @@
             }
 
             detectedRadaresCount = 0;
+            // Ampliamos el radio de cobertura a 300 metros del trazado para garantizar que pille autovías/carreteras
             radares.forEach(r => {
                 const rLat = parseFloat(r.lat);
                 const rLon = parseFloat(r.lon);
-                for (let c of coords) {
-                    if (getDistanceMeters(c[1], c[0], rLat, rLon) < 60) {
+                for (let i = 0; i < coords.length; i += Math.max(1, Math.floor(coords.length / 200))) {
+                    if (getDistanceMeters(coords[i][1], coords[i][0], rLat, rLon) < 300) {
                         detectedRadaresCount++;
                         break;
                     }
@@ -460,7 +464,7 @@
                 }
             }
 
-            if (closest && minDist < 1200) {
+            if (closest && minDist < 1500) {
                 const rName = (closest.tipo || 'RADAR').replace('_', ' ');
                 radarType.innerText = `${rName} (${closest.velocidad || 80} km/h)`;
                 radarDist.innerText = `${Math.round(minDist)} m`;
