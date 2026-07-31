@@ -1,1 +1,10 @@
-
+{
+  "paises_activos": ["ES", "AND", "FR", "DE", "IT", "CH", "AT"],
+  "opciones": {
+    "incluir_fijos": true,
+    "incluir_moviles_habituales": true,
+    "incluir_foto_rojo": true,
+    "incluir_camaras_cinturon": true,
+    "incluir_tramos_negros": true
+  }
+}
