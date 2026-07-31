@@ -49,7 +49,6 @@
         }
         .waze-search-input { flex: 1; background: transparent; border: none; color: #fff; font-size: 1rem; outline: none; }
         
-        /* Resultados de búsqueda desplegables */
         .search-results-list {
             max-height: 220px; overflow-y: auto; margin-top: 10px; display: none; flex-direction: column; gap: 6px;
         }
@@ -78,7 +77,6 @@
         .btn-cancel-route { flex: 1; background: rgba(255,255,255,0.1); color: #fff; padding: 14px; border-radius: 14px; border: none; font-weight: 800; cursor: pointer; }
         .btn-go-route { flex: 2; background: linear-gradient(135deg, #00c853, #00e676); color: #000; padding: 14px; border-radius: 14px; border: none; font-weight: 900; font-size: 1.05rem; cursor: pointer; box-shadow: 0 4px 20px rgba(0,200,83,0.4); }
 
-        /* Botón Activo Navegación */
         .active-nav-sheet {
             position: absolute; bottom: 24px; left: 16px; right: 16px; z-index: 20; display: none;
         }
@@ -99,7 +97,6 @@
     <div id="map-container">
         <div id="map"></div>
 
-        <!-- HUD Superior -->
         <div class="hud-top">
             <div class="hud-cards-row">
                 <div class="hud-card speed-card">
@@ -116,7 +113,6 @@
 
         <button id="recenterBtn" class="recenter-btn">🎯</button>
 
-        <!-- Buscador inferior tipo Waze -->
         <div id="searchSheet" class="search-sheet">
             <div class="sheet-handle"></div>
             <div class="waze-search-bar">
@@ -126,7 +122,6 @@
             <div id="searchResults" class="search-results-list"></div>
         </div>
 
-        <!-- Pantalla Previsualización Ruta -->
         <div id="routePreviewSheet" class="route-preview-sheet">
             <div class="route-info-row">
                 <div class="route-title" id="previewTitle">Destino</div>
@@ -141,7 +136,6 @@
             </div>
         </div>
 
-        <!-- Botón Detener Navegación -->
         <div id="activeNavSheet" class="active-nav-sheet">
             <button class="btn-stop" id="stopNavBtn">DETENER NAVEGACIÓN</button>
         </div>
@@ -159,6 +153,7 @@
         let currentPos = { lat: 41.3871, lon: 2.1700, heading: 0, speed: 0 };
         let selectedDestination = null;
         let detectedRadaresCount = 0;
+        let spanishVoice = null;
 
         const destInput = document.getElementById('destInput');
         const searchResults = document.getElementById('searchResults');
@@ -178,12 +173,30 @@
         const radarDist = document.getElementById('radarDist');
         const recenterBtn = document.getElementById('recenterBtn');
 
+        // Cargar voces en español de forma robusta
+        function loadVoices() {
+            if (!('speechSynthesis' in window)) return;
+            const voices = window.speechSynthesis.getVoices();
+            // Buscar una voz en castellano (España o general)
+            spanishVoice = voices.find(v => v.lang === 'es-ES' || v.lang === 'es_ES') || 
+                           voices.find(v => v.lang.startsWith('es')) || 
+                           voices[0];
+        }
+
+        if ('speechSynthesis' in window) {
+            window.speechSynthesis.onvoiceschanged = loadVoices;
+            loadVoices();
+        }
+
         function speak(text) {
             if ('speechSynthesis' in window) {
                 window.speechSynthesis.cancel();
                 const utterance = new SpeechSynthesisUtterance(text);
-                utterance.lang = 'esc-ES';
-                utterance.rate = 1.0;
+                if (spanishVoice) {
+                    utterance.voice = spanishVoice;
+                }
+                utterance.lang = 'es-ES';
+                utterance.rate = 1.05;
                 window.speechSynthesis.speak(utterance);
             }
         }
@@ -225,7 +238,6 @@
             }
         }
 
-        // Generar e inyectar icono gráfico vectorial de Radar Fijo (Cámara Estilizada)
         function loadRadarIconAndData() {
             const svgIcon = `
                 <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24">
@@ -239,7 +251,9 @@
 
             map.loadImage(url, (error, image) => {
                 if (error) throw error;
-                map.addImage('radar-icon', image);
+                if (!map.hasImage('radar-icon')) {
+                    map.addImage('radar-icon', image);
+                }
                 loadRadares();
             });
         }
@@ -257,11 +271,11 @@
 
                 map.addSource('radares-src', { type: 'geojson', data: { type: 'FeatureCollection', features } });
                 
-                // Capa basada en iconos gráficos profesionales en lugar de círculos planos
                 map.addLayer({
                     id: 'radares-layer',
                     type: 'symbol',
                     source: 'radares-src',
+                    minzoom: 11, // <-- CLAVE: Solo se muestran a partir de zoom 11 para evitar saturar Europa entera
                     layout: {
                         'icon-image': 'radar-icon',
                         'icon-size': 0.85,
@@ -369,7 +383,7 @@
                     source: 'route-src',
                     layout: { 'line-join': 'round', 'line-cap': 'round' },
                     paint: { 'line-color': '#00e5ff', 'line-width': 6, 'line-opacity': 0.85 }
-                }, 'radares-layer');
+                }, map.getLayer('radares-layer') ? 'radares-layer' : undefined);
             }
         }
 
@@ -453,7 +467,7 @@
 
                 if (minDist <= 500 && lastAlertedRadar !== closest) {
                     lastAlertedRadar = closest;
-                    speak(`Atención, radar a 500 metros. Límite de ${closest.velocidad || 80} kilómetros por hora.`);
+                    speak(`Atención, radar a quinientos metros. Límite de ${closest.velocidad || 80} kilómetros por hora.`);
                 }
             } else {
                 radarType.innerText = "Sin Alertas";
