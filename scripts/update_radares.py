@@ -1,12 +1,12 @@
 import json
 import os
-import requests
+import urllib.request
+import urllib.parse
 
 def fetch_osm_speed_cameras():
     print("🤖 Consultando OpenStreetMap (Overpass API)...")
     
-    # Consulta Overpass optimizada para todos los radares fijos y de tramo en España (bounding box de España)
-    overpass_url = "https://overpass-api.de/api/interpreter"
+    # Consulta Overpass optimizada para radares en España
     overpass_query = """
     [out:json][timeout:60];
     (
@@ -16,23 +16,24 @@ def fetch_osm_speed_cameras():
     out body;
     """
     
-    # Servidores de respaldo por si el principal da timeout
     endpoints = [
         "https://overpass-api.de/api/interpreter",
-        "https://overpass.kumi.systems/api/interpreter",
-        "https://maps.mail.ru/osm/tools/overpass/api/interpreter"
+        "https://overpass.kumi.systems/api/interpreter"
     ]
     
     elements = []
+    encoded_data = urllib.parse.urlencode({'data': overpass_query}).encode('utf-8')
+    
     for url in endpoints:
         try:
-            response = requests.post(url, data={'data': overpass_query}, timeout=60)
-            if response.status_code == 200:
-                data = response.json()
-                elements = data.get('elements', [])
-                if elements:
-                    print(f"✅ Descargados {len(elements)} radares desde {url}")
-                    break
+            req = urllib.request.Request(url, data=encoded_data, headers={'User-Agent': 'RadarPWA/1.0'})
+            with urllib.request.urlopen(req, timeout=60) as response:
+                if response.status == 200:
+                    data = json.loads(response.read().decode('utf-8'))
+                    elements = data.get('elements', [])
+                    if elements:
+                        print(f"✅ Descargados {len(elements)} radares desde {url}")
+                        break
         except Exception as e:
             print(f"⚠️ Falló el servidor {url}: {e}")
             continue
@@ -44,12 +45,21 @@ def fetch_osm_speed_cameras():
         tags = elem.get('tags', {})
         
         if lat and lon:
-            speed = tags.get('maxspeed', 'Desconocido')
+            maxspeed = tags.get('maxspeed', None)
+            try:
+                speed = int(maxspeed) if maxspeed and str(maxspeed).isdigit() else 80
+            except ValueError:
+                speed = 80
+
+            tipo_desc = "Radar Fijo"
+            if tags.get('enforcement') == 'maxspeed':
+                tipo_desc = "Radar de Tramo / Fijo"
+
             radares.append({
                 "id": str(elem.get('id')),
-                "lat": float(lat),
-                "lon": float(lon),
-                "tipo": f"Radar Fijo ({speed} km/h)" if speed != 'Desconocido' else "Radar Fijo",
+                "lat": round(float(lat), 6),
+                "lon": round(float(lon), 6),
+                "tipo": tipo_desc,
                 "velocidad": speed
             })
             
@@ -59,17 +69,19 @@ def main():
     radares = fetch_osm_speed_cameras()
     
     if not radares:
-        print("⚠️ No se pudieron descargar radares. Generando base de datos de prueba...")
-        # Fallback de seguridad con radares clave si la API estuviera caída
+        print("⚠️ No se pudieron descargar radares de la API. Generando fallback...")
         radares = [
-            {"id": "demo1", "lat": 41.3851, "lon": 2.1734, "tipo": "Radar Fijo (80 km/h)", "velocidad": "80"},
-            {"id": "demo2", "lat": 41.1995, "lon": 1.6280, "tipo": "Radar Fijo (120 km/h)", "velocidad": "120"}
+            {"id": "demo1", "lat": 41.3851, "lon": 2.1734, "tipo": "Radar Fijo", "velocidad": 80},
+            {"id": "demo2", "lat": 41.1995, "lon": 1.6280, "tipo": "Radar Fijo", "velocidad": 120}
         ]
 
-    # Crear directorios de destino
+    # Asignar IDs limpios
+    for idx, r in enumerate(radares, 1):
+        r['id'] = idx
+
+    # Crear directorios y guardar JSON
     os.makedirs("public", exist_ok=True)
     
-    # Guardar en raíz y en public por compatibilidad
     for path in ["radares.json", "public/radares.json"]:
         with open(path, "w", encoding="utf-8") as f:
             json.dump(radares, f, ensure_ascii=False, indent=2)
