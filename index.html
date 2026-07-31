@@ -4,12 +4,20 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Avisador Radares</title>
+  
+  <!-- Configuración PWA e iOS -->
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#2563eb">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
   <style>
-    body { font-family: system-ui, sans-serif; background: #111; color: #fff; text-align: center; padding: 20px; }
+    body { font-family: system-ui, -apple-system, sans-serif; background: #111; color: #fff; text-align: center; padding: 20px; margin: 0; }
+    h1 { font-size: 24px; margin-top: 10px; }
     .card { background: #222; border-radius: 12px; padding: 15px; margin: 15px 0; border: 1px solid #333; }
-    button { background: #2563eb; color: white; border: none; padding: 15px 25px; font-size: 18px; border-radius: 8px; font-weight: bold; width: 100%; margin-top: 10px; }
+    button { background: #2563eb; color: white; border: none; padding: 16px 25px; font-size: 18px; border-radius: 10px; font-weight: bold; width: 100%; margin-top: 5px; cursor: pointer; }
     .radar { border-left: 5px solid #ef4444; }
-    .big-num { font-size: 32px; font-weight: bold; color: #3b82f6; }
+    .big-num { font-size: 36px; font-weight: bold; color: #3b82f6; margin-top: 5px; }
   </style>
 </head>
 <body>
@@ -29,7 +37,7 @@
   <div class="card radar">
     <div>Radar más cercano</div>
     <div id="radarInfo" style="margin-top: 5px; font-weight: bold;">Cargando base de datos...</div>
-    <div id="radarDist" style="color: #ef4444; font-size: 20px; font-weight: bold; margin-top: 5px;">-- m</div>
+    <div id="radarDist" style="color: #ef4444; font-size: 24px; font-weight: bold; margin-top: 5px;">-- m</div>
   </div>
 
 <script>
@@ -37,6 +45,7 @@
   let wakeLock = null;
   let ultimoAviso = 0;
 
+  // Voz de Siri / iOS
   function hablar(texto) {
     if ('speechSynthesis' in window) {
       window.speechSynthesis.cancel();
@@ -47,16 +56,18 @@
     }
   }
 
+  // Prevenir que la pantalla se apague en el coche
   async function mantenerPantallaEncendida() {
     try {
       if ('wakeLock' in navigator) {
         wakeLock = await navigator.wakeLock.request('screen');
       }
     } catch (err) {
-      console.log("WakeLock no soportado");
+      console.log("WakeLock no soportado o denegado");
     }
   }
 
+  // Cálculo de distancia en metros (Haversine)
   function calcularDistancia(lat1, lon1, lat2, lon2) {
     const R = 6371e3;
     const φ1 = lat1 * Math.PI/180;
@@ -71,7 +82,7 @@
     return Math.round(R * c);
   }
 
-  // Cargar BDD de radares desde el JSON generado por Python
+  // Cargar el JSON de radares generado por el script de Python
   async function cargarRadares() {
     try {
       const resp = await fetch('radares.json');
@@ -79,16 +90,17 @@
       radaresBDD = await resp.json();
       document.getElementById('radarInfo').innerText = `BDD Cargada (${radaresBDD.length} radares)`;
     } catch (e) {
-      document.getElementById('radarInfo').innerText = "Esperando primera sincronización...";
+      document.getElementById('radarInfo').innerText = "Sin base de datos (Ejecuta el Action en GitHub)";
     }
   }
 
+  // Evento al pulsar el botón principal
   document.getElementById('btnStart').addEventListener('click', async () => {
     await cargarRadares();
-    hablar("Avisador activado con base de datos real");
+    hablar("Avisador activado");
     mantenerPantallaEncendida();
     
-    document.getElementById('status').innerText = "Rastreando ubicación...";
+    document.getElementById('status').innerText = "Rastreando ubicación en tiempo real...";
     document.getElementById('btnStart').style.background = "#16a34a";
     document.getElementById('btnStart').innerText = "Avisador Activo";
 
@@ -105,6 +117,7 @@
         let radarCercano = null;
         let distMinima = Infinity;
 
+        // Buscar el radar más cercano
         radaresBDD.forEach(radar => {
           const d = calcularDistancia(lat, lon, radar.lat, radar.lon);
           if (d < distMinima) {
@@ -117,6 +130,7 @@
           document.getElementById('radarInfo').innerText = `${radarCercano.tipo} (${radarCercano.velocidad} km/h)`;
           document.getElementById('radarDist').innerText = `${distMinima} metros`;
 
+          // Alerta sonora si estamos a 500m o menos (con margen de 30 seg entre avisos)
           const ahora = Date.now();
           if (distMinima <= 500 && (ahora - ultimoAviso > 30000)) {
             hablar(`Atención, ${radarCercano.tipo} a ${radarCercano.velocidad} kilómetros por hora a ${distMinima} metros`);
@@ -124,7 +138,7 @@
           }
         }
       }, err => {
-        alert("Error GPS: Permite el acceso a la ubicación");
+        alert("Error de GPS: Asegúrate de permitir la ubicación en Safari");
       }, {
         enableHighAccuracy: true,
         maximumAge: 0,
@@ -133,7 +147,16 @@
     }
   });
 
-  // Cargar radares en segundo plano al abrir
+  // Registrar Service Worker para funcionamiento Offline
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('sw.js')
+        .then(() => console.log('Service Worker listo'))
+        .catch(err => console.log('Error SW:', err));
+    });
+  }
+
+  // Cargar radares en segundo plano al iniciar la app
   cargarRadares();
 </script>
 
