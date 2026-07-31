@@ -1,2 +1,1 @@
 # rw-pwa
-.gitignore
