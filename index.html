@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Avisador Radares</title>
+  <style>
+    body { font-family: system-ui, sans-serif; background: #111; color: #fff; text-align: center; padding: 20px; }
+    .card { background: #222; border-radius: 12px; padding: 15px; margin: 15px 0; border: 1px solid #333; }
+    button { background: #2563eb; color: white; border: none; padding: 15px 25px; font-size: 18px; border-radius: 8px; font-weight: bold; width: 100%; margin-top: 10px; }
+    .radar { border-left: 5px solid #ef4444; }
+    .big-num { font-size: 32px; font-weight: bold; color: #3b82f6; }
+  </style>
+</head>
+<body>
+
+  <h1>Avisador de Radares</h1>
+  
+  <div class="card">
+    <button id="btnStart">1. Activar Avisador y GPS</button>
+    <p id="status" style="font-size: 14px; color: #aaa; margin-top: 10px;">Presiona para iniciar</p>
+  </div>
+
+  <div class="card">
+    <div>Velocidad actual</div>
+    <div id="speed" class="big-num">0 km/h</div>
+  </div>
+
+  <div class="card radar">
+    <div>Radar más cercano</div>
+    <div id="radarInfo" style="margin-top: 5px; font-weight: bold;">--</div>
+    <div id="radarDist" style="color: #ef4444; font-size: 20px; font-weight: bold; margin-top: 5px;">-- m</div>
+  </div>
+
+<script>
+  // Datos de prueba (Radares de demostración)
+  const radaresPrueba = [
+    { id: 1, lat: 41.3879, lon: 2.1699, tipo: "Radar Fijo", velocidad: 80 },
+    { id: 2, lat: 41.3900, lon: 2.1700, tipo: "Semáforo Foto", velocidad: 50 }
+  ];
+
+  let wakeLock = null;
+  let ultimoAviso = 0;
+
+  // Voz de Siri / iOS
+  function hablar(texto) {
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.cancel(); // Detiene audios previos
+      const msg = new SpeechSynthesisUtterance(texto);
+      msg.lang = 'es-ES';
+      msg.rate = 1.0;
+      window.speechSynthesis.speak(msg);
+    }
+  }
+
+  // Evitar que la pantalla del iPhone se apague
+  async function mantenerPantallaEncendida() {
+    try {
+      if ('wakeLock' in navigator) {
+        wakeLock = await navigator.wakeLock.request('screen');
+      }
+    } catch (err) {
+      console.log("WakeLock no soportado o denegado");
+    }
+  }
+
+  // Cálculo de distancia en metros (Haversine)
+  function calcularDistancia(lat1, lon1, lat2, lon2) {
+    const R = 6371e3;
+    const φ1 = lat1 * Math.PI/180;
+    const φ2 = lat2 * Math.PI/180;
+    const Δφ = (lat2-lat1) * Math.PI/180;
+    const Δλ = (lon2-lon1) * Math.PI/180;
+
+    const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) +
+              Math.cos(φ1) * Math.cos(φ2) *
+              Math.sin(Δλ/2) * Math.sin(Δλ/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    return Math.round(R * c);
+  }
+
+  // Iniciar GPS
+  document.getElementById('btnStart').addEventListener('click', () => {
+    hablar("Avisador de radares activado");
+    mantenerPantallaEncendida();
+    
+    document.getElementById('status').innerText = "Buscando señal GPS y manteniendo pantalla encendida...";
+    document.getElementById('btnStart').style.background = "#16a34a";
+    document.getElementById('btnStart').innerText = "Avisador Activo";
+
+    if ("geolocation" in navigator) {
+      navigator.geolocation.watchPosition(pos => {
+        const lat = pos.coords.latitude;
+        const lon = pos.coords.longitude;
+        const speed = pos.coords.speed ? Math.round(pos.coords.speed * 3.6) : 0;
+
+        document.getElementById('speed').innerText = `${speed} km/h`;
+
+        // Buscar el radar más cercano
+        let radarCercano = null;
+        let distMinima = Infinity;
+
+        radaresPrueba.forEach(radar => {
+          const d = calcularDistancia(lat, lon, radar.lat, radar.lon);
+          if (d < distMinima) {
+            distMinima = d;
+            radarCercano = radar;
+          }
+        });
+
+        if (radarCercano) {
+          document.getElementById('radarInfo').innerText = `${radarCercano.tipo} (${radarCercano.velocidad} km/h)`;
+          document.getElementById('radarDist').innerText = `${distMinima} metros`;
+
+          // Alerta sonora si estamos a menos de 500m (con margen de 30s para no repetir continuamente)
+          const ahora = Date.now();
+          if (distMinima <= 500 && (ahora - ultimoAviso > 30000)) {
+            hablar(`Atención, ${radarCercano.tipo} a ${radarCercano.velocidad} kilómetros por hora a ${distMinima} metros`);
+            ultimoAviso = ahora;
+          }
+        }
+      }, err => {
+        alert("Error al obtener GPS: Permite la localización en Safari");
+      }, {
+        enableHighAccuracy: true,
+        maximumAge: 0,
+        timeout: 10000
+      });
+    }
+  });
+</script>
+
+</body>
+</html>
