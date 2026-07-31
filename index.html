@@ -70,7 +70,7 @@
         }
 
         .user-location-marker { width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; }
-        .user-arrow { width: 0; height: 0; border-left: 9px solid transparent; border-right: 9px solid transparent; border-bottom: 22px solid #00e5ff; filter: drop-shadow(0 0 8px #00e5ff); transition: transform 0.2s ease; }
+        .user-arrow { width: 0; height: 0; border-left: 9px solid transparent; border-right: 9px solid transparent; border-bottom: 22px solid #00e5ff; filter: drop-shadow(0 0 8px #00e5ff); transition: transform 0.3s ease-out; }
     </style>
 </head>
 <body>
@@ -129,8 +129,9 @@
         let userMarker;
         let watchId = null;
         let isNavigating = false;
+        let userTracking = true; // Si el mapa sigue a la cámara o el usuario está navegando libremente
         let currentPos = { lat: 41.3871, lon: 2.1700, heading: 0, speed: 0 };
-        let hasInitialPosition = false;
+        let lastCameraPos = { lat: 0, lon: 0, heading: 0 };
 
         const settingsToggle = document.getElementById('settingsToggle');
         const settingsPanel = document.getElementById('settingsPanel');
@@ -167,24 +168,26 @@
                 .setLngLat([currentPos.lon, currentPos.lat])
                 .addTo(map);
 
+            // Si el usuario arrastra el mapa manualmente, pausar el seguimiento automático de cámara
+            map.on('dragstart', () => { userTracking = false; });
+            map.on('pitchstart', () => { userTracking = false; });
+
             map.on('load', () => {
                 loadRadares();
-                initRealGPS(); // Pedir ubicación real de inmediato
+                initRealGPS();
             });
         }
 
-        // Obtener ubicación real del usuario desde el primer instante
         function initRealGPS() {
             if ("geolocation" in navigator) {
                 navigator.geolocation.getCurrentPosition(
                     (pos) => {
                         const lat = pos.coords.latitude;
                         const lon = pos.coords.longitude;
-                        hasInitialPosition = true;
-                        updatePosition(lat, lon, 0, pos.coords.heading || 0);
+                        updatePosition(lat, lon, 0, pos.coords.heading || 0, true);
                         map.flyTo({ center: [lon, lat], zoom: 15 });
                     },
-                    (err) => console.warn("Permiso de ubicación denegado o no disponible:", err),
+                    (err) => console.warn("Permiso de GPS no concedido aún:", err),
                     { enableHighAccuracy: true }
                 );
             }
@@ -253,7 +256,7 @@
             }
         }
 
-        function updatePosition(lat, lon, speed = 0, heading = 0) {
+        function updatePosition(lat, lon, speed = 0, heading = 0, forceCamera = false) {
             currentPos = { lat, lon, speed, heading };
             userMarker.setLngLat([lon, lat]);
             
@@ -263,14 +266,23 @@
             speedDisplay.innerText = Math.round(speed);
             checkProximity(lat, lon);
 
-            if (isNavigating) {
-                map.easeTo({
-                    center: [lon, lat],
-                    bearing: heading,
-                    pitch: 60,
-                    zoom: 16.5,
-                    duration: 800
-                });
+            // Mover cámara solo si la navegación está activa y el usuario no ha desplazado el mapa libremente
+            if (isNavigating && (userTracking || forceCamera)) {
+                const distMoved = getDistanceMeters(lat, lon, lastCameraPos.lat, lastCameraPos.lon);
+                const headingDiff = Math.abs(heading - lastCameraPos.heading);
+
+                // Evitar spam a MapLibre si apenas nos hemos movido menos de 1.5 metros
+                if (distMoved > 1.5 || headingDiff > 5 || forceCamera) {
+                    lastCameraPos = { lat, lon, heading };
+                    map.easeTo({
+                        center: [lon, lat],
+                        bearing: heading,
+                        pitch: 60,
+                        zoom: 16.5,
+                        duration: 500,
+                        easing: t => t
+                    });
+                }
             }
         }
 
@@ -310,21 +322,28 @@
         searchBtn.addEventListener('click', async () => {
             const query = destInput.value;
             if (!query) return;
+            destInput.blur(); // Ocultar teclado en móviles
+            userTracking = false; // Permitir al usuario explorar la zona buscada
+
             try {
                 const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}`);
                 const data = await res.json();
                 if (data && data.length > 0) {
                     const top = data[0];
-                    map.flyTo({ center: [parseFloat(top.lon), parseFloat(top.lat)], zoom: 14 });
+                    map.flyTo({ center: [parseFloat(top.lon), parseFloat(top.lat)], zoom: 14, pitch: 0 });
                 } else {
                     alert("Destino no encontrado");
                 }
             } catch (e) { console.error(e); }
         });
 
-        // Activar/Desactivar Rastreo GPS Real
+        destInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') searchBtn.click();
+        });
+
         toggleBtn.addEventListener('click', () => {
             isNavigating = !isNavigating;
+            userTracking = isNavigating;
 
             if (isNavigating) {
                 toggleBtn.innerText = "DETENER NAVEGACIÓN";
@@ -333,20 +352,15 @@
                 if ("geolocation" in navigator) {
                     watchId = navigator.geolocation.watchPosition(
                         (pos) => {
-                            const spd = (pos.coords.speed || 0) * 3.6; // m/s a km/h
+                            const spd = (pos.coords.speed || 0) * 3.6;
                             const hdg = pos.coords.heading || 0;
                             updatePosition(pos.coords.latitude, pos.coords.longitude, spd, hdg);
                         },
-                        (err) => {
-                            alert("Error GPS: Asegúrate de dar permisos de Ubicación en el navegador.");
-                            console.error(err);
-                        },
+                        (err) => console.error("Error GPS:", err),
                         { enableHighAccuracy: true, maximumAge: 1000, timeout: 10000 }
                     );
-                } else {
-                    alert("Tu navegador no soporta geolocalización.");
                 }
-
+                updatePosition(currentPos.lat, currentPos.lon, currentPos.speed, currentPos.heading, true);
             } else {
                 toggleBtn.innerText = "INICIAR NAVEGACIÓN 3D";
                 toggleBtn.className = "btn btn-inactive";
@@ -355,12 +369,13 @@
                     watchId = null;
                 }
                 speedDisplay.innerText = "0";
-                map.easeTo({ pitch: 0, bearing: 0, duration: 1000 });
+                map.easeTo({ pitch: 0, bearing: 0, duration: 800 });
             }
         });
 
         recenterBtn.addEventListener('click', () => {
-            map.flyTo({ center: [currentPos.lon, currentPos.lat], zoom: 16, pitch: isNavigating ? 60 : 0 });
+            userTracking = true;
+            map.flyTo({ center: [currentPos.lon, currentPos.lat], zoom: 16, pitch: isNavigating ? 60 : 0, bearing: currentPos.heading });
         });
 
         [layerSpeed, layerTrafficSignals, layerBelt].forEach(el => el.addEventListener('change', updateMapFilters));
