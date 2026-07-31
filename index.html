@@ -128,9 +128,9 @@
         let radares = [];
         let userMarker;
         let watchId = null;
-        let simInterval = null;
         let isNavigating = false;
         let currentPos = { lat: 41.3871, lon: 2.1700, heading: 0, speed: 0 };
+        let hasInitialPosition = false;
 
         const settingsToggle = document.getElementById('settingsToggle');
         const settingsPanel = document.getElementById('settingsPanel');
@@ -156,8 +156,8 @@
                 container: 'map',
                 style: 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json',
                 center: [currentPos.lon, currentPos.lat],
-                zoom: 14,
-                pitch: 45
+                zoom: 13,
+                pitch: 0
             });
 
             const el = document.createElement('div');
@@ -167,12 +167,31 @@
                 .setLngLat([currentPos.lon, currentPos.lat])
                 .addTo(map);
 
-            map.on('load', loadRadares);
+            map.on('load', () => {
+                loadRadares();
+                initRealGPS(); // Pedir ubicación real de inmediato
+            });
+        }
+
+        // Obtener ubicación real del usuario desde el primer instante
+        function initRealGPS() {
+            if ("geolocation" in navigator) {
+                navigator.geolocation.getCurrentPosition(
+                    (pos) => {
+                        const lat = pos.coords.latitude;
+                        const lon = pos.coords.longitude;
+                        hasInitialPosition = true;
+                        updatePosition(lat, lon, 0, pos.coords.heading || 0);
+                        map.flyTo({ center: [lon, lat], zoom: 15 });
+                    },
+                    (err) => console.warn("Permiso de ubicación denegado o no disponible:", err),
+                    { enableHighAccuracy: true }
+                );
+            }
         }
 
         async function loadRadares() {
             try {
-                // Añadimos timestamp para evitar caché agresiva en móviles
                 const res = await fetch('radares.json?v=' + new Date().getTime());
                 radares = await res.json();
                 updateMapFilters();
@@ -190,7 +209,6 @@
 
             const features = radares.filter(r => {
                 const t = String(r.tipo || '').toUpperCase();
-                
                 if (t.includes('ROJO') || t.includes('SEMAFORO') || t.includes('TRAFFIC_SIGNALS')) {
                     return showTraffic;
                 }
@@ -304,6 +322,7 @@
             } catch (e) { console.error(e); }
         });
 
+        // Activar/Desactivar Rastreo GPS Real
         toggleBtn.addEventListener('click', () => {
             isNavigating = !isNavigating;
 
@@ -314,33 +333,34 @@
                 if ("geolocation" in navigator) {
                     watchId = navigator.geolocation.watchPosition(
                         (pos) => {
-                            const spd = (pos.coords.speed || 0) * 3.6;
-                            updatePosition(pos.coords.latitude, pos.coords.longitude, spd, pos.coords.heading || 0);
+                            const spd = (pos.coords.speed || 0) * 3.6; // m/s a km/h
+                            const hdg = pos.coords.heading || 0;
+                            updatePosition(pos.coords.latitude, pos.coords.longitude, spd, hdg);
                         },
-                        (err) => console.warn("GPS error/denegado:", err),
-                        { enableHighAccuracy: true }
+                        (err) => {
+                            alert("Error GPS: Asegúrate de dar permisos de Ubicación en el navegador.");
+                            console.error(err);
+                        },
+                        { enableHighAccuracy: true, maximumAge: 1000, timeout: 10000 }
                     );
+                } else {
+                    alert("Tu navegador no soporta geolocalización.");
                 }
-
-                let simLat = currentPos.lat;
-                let simLon = currentPos.lon;
-                simInterval = setInterval(() => {
-                    simLat += 0.00004;
-                    simLon += 0.00004;
-                    updatePosition(simLat, simLon, 65, 42);
-                }, 1000);
 
             } else {
                 toggleBtn.innerText = "INICIAR NAVEGACIÓN 3D";
                 toggleBtn.className = "btn btn-inactive";
-                if (watchId) navigator.geolocation.clearWatch(watchId);
-                if (simInterval) clearInterval(simInterval);
+                if (watchId !== null) {
+                    navigator.geolocation.clearWatch(watchId);
+                    watchId = null;
+                }
                 speedDisplay.innerText = "0";
+                map.easeTo({ pitch: 0, bearing: 0, duration: 1000 });
             }
         });
 
         recenterBtn.addEventListener('click', () => {
-            map.flyTo({ center: [currentPos.lon, currentPos.lat], zoom: 16, pitch: 60 });
+            map.flyTo({ center: [currentPos.lon, currentPos.lat], zoom: 16, pitch: isNavigating ? 60 : 0 });
         });
 
         [layerSpeed, layerTrafficSignals, layerBelt].forEach(el => el.addEventListener('change', updateMapFilters));
