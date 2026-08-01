@@ -44,6 +44,24 @@ body.theme-day{
   --accent-2:#6a4fd8;
   --sheet-bg: rgba(255,255,255,0.97);
 }
+/* Modo parabrisas: todo más grande y con más contraste, pensado para ver de un vistazo
+   con el móvil en un soporte, sin tener que acercar la vista. */
+body.windshield-mode{ --text:#ffffff; --text-muted:#d8dce3; }
+body.windshield-mode.theme-day{ --text:#000000; --text-muted:#20242c; }
+body.windshield-mode .speed-dial-wrap{ width:132px; height:132px; }
+body.windshield-mode .speed-dial-inner{ width:112px; height:112px; }
+body.windshield-mode .speed-val{ font-size:2.7rem; }
+body.windshield-mode .speed-unit{ font-size:0.7rem; }
+body.windshield-mode .radar-hud{ padding:14px 16px; }
+body.windshield-mode .radar-title{ font-size:0.75rem; }
+body.windshield-mode .radar-info{ font-size:1.1rem; }
+body.windshield-mode .radar-dist-val{ font-size:1.7rem; }
+body.windshield-mode .maneuver-icon{ font-size:2.8rem; }
+body.windshield-mode .maneuver-instruction{ font-size:1.25rem; }
+body.windshield-mode .maneuver-distance{ font-size:1.05rem; }
+body.windshield-mode .maneuver-eta-mini .eta-time{ font-size:1.3rem; }
+body.windshield-mode .nav-progress-metric .v{ font-size:1.4rem; }
+body.windshield-mode .ctrl-btn, body.windshield-mode .zoom-cluster button{ font-size:1.4rem; }
 *{ box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent; }
 html,body{ height:100%; overscroll-behavior:none; }
 body{
@@ -464,6 +482,7 @@ body.theme-day .segmented button.active{ color:#fff; }
     </div>
     <div class="nav-actions">
       <button class="btn-icon-round" id="muteBtn">🔊</button>
+      <button class="btn-icon-round" id="shareTripBtn">📤</button>
       <button class="btn-stop" id="stopNavBtn">✕ DETENER NAVEGACIÓN</button>
     </div>
   </div>
@@ -483,6 +502,13 @@ body.theme-day .segmented button.active{ color:#fff; }
         <button data-val="day">☀️ Día</button>
         <button data-val="night">🌙 Noche</button>
       </div>
+      <div class="toggle-row">
+        <div>
+          <div class="label">🖥️ Modo parabrisas</div>
+          <div class="sub">Números y avisos más grandes, alto contraste para montaje en soporte</div>
+        </div>
+        <div class="switch" id="windshieldSwitch"></div>
+      </div>
     </div>
 
     <div class="divider"></div>
@@ -497,6 +523,13 @@ body.theme-day .segmented button.active{ color:#fff; }
         <div class="style-pick" data-style="race">🏎️ Carreras</div>
       </div>
       <div class="swatch-row" id="markerColorRow"></div>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="settings-section">
+      <div class="settings-section-title">🎯 Tipos de radar visibles</div>
+      <div id="radarTypeToggles"></div>
     </div>
 
     <div class="divider"></div>
@@ -549,6 +582,12 @@ body.theme-day .segmented button.active{ color:#fff; }
 
     <div class="settings-section">
       <div class="settings-section-title">🚘 Vehículo y consumo (para estimar el coste del viaje)</div>
+      <div class="field-row">
+        <div class="field-label">Elige tu coche (consumo medio orientativo, WLTP aprox.)</div>
+        <select id="carPresetSelect" style="background:var(--surface-2); border:1px solid var(--border); border-radius:10px; padding:10px; color:var(--text); font-family:'Space Grotesk'; font-size:0.9rem;">
+          <option value="">Personalizado (ajustar manualmente)</option>
+        </select>
+      </div>
       <div class="segmented" id="vehicleTypeSegmented">
         <button data-val="combustion" class="active">⛽ Combustión</button>
         <button data-val="electric">🔌 Eléctrico</button>
@@ -589,6 +628,10 @@ body.theme-day .segmented button.active{ color:#fff; }
     </div>
     <div class="settings-section">
       <div class="settings-section-title">Historial de viajes</div>
+      <div style="display:flex; gap:8px;">
+        <button class="btn-cancel-route" style="padding:10px;font-size:0.78rem;" id="exportCsvBtn">⬇️ Exportar CSV</button>
+        <button class="btn-cancel-route" style="padding:10px;font-size:0.78rem;" id="exportJsonBtn">⬇️ Exportar JSON</button>
+      </div>
       <div id="tripHistoryList"></div>
       <div class="copilot-preview" id="tripHistoryEmpty">Aún no hay viajes registrados. Completa una ruta para ver aquí tu detalle: excesos de velocidad, acelerones, frenazos, y coste estimado de combustible.</div>
     </div>
@@ -606,6 +649,47 @@ const LIGHT_STYLE = 'https://basemaps.cartocdn.com/gl/positron-gl-style/style.js
 const DARK_STYLE  = 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json';
 const MARKER_COLORS = ['#00e5ff','#ff3d1f','#00e676','#ffab00','#7c5cff','#ffffff'];
 const CAR_EMOJI = { car:'🚗', suv:'🚙', police:'🚓', race:'🏎️' };
+
+/* Tabla curada de consumos medios aproximados (WLTP mixto orientativo) de los modelos más
+   vendidos en España. NO es una base de datos de matrículas en tiempo real (eso requeriría
+   pagar acceso a un proveedor tipo DGT/CO2 EEA y un backend) — esto es la alternativa 100%
+   client-side: eliges tu coche de la lista y te precarga un consumo realista, editable después. */
+const CAR_PRESETS = [
+  { brand:'SEAT', model:'Ibiza 1.0 TSI', type:'combustion', consumption:5.4 },
+  { brand:'SEAT', model:'León 1.5 TSI', type:'combustion', consumption:5.9 },
+  { brand:'SEAT', model:'Arona', type:'combustion', consumption:5.6 },
+  { brand:'Volkswagen', model:'Polo 1.0 TSI', type:'combustion', consumption:5.2 },
+  { brand:'Volkswagen', model:'Golf 1.5 TSI', type:'combustion', consumption:5.8 },
+  { brand:'Volkswagen', model:'ID.3', type:'electric', consumption:15.4 },
+  { brand:'Renault', model:'Clio TCe', type:'combustion', consumption:5.3 },
+  { brand:'Renault', model:'Mégane', type:'combustion', consumption:6.0 },
+  { brand:'Renault', model:'Captur', type:'combustion', consumption:5.7 },
+  { brand:'Peugeot', model:'208', type:'combustion', consumption:5.2 },
+  { brand:'Peugeot', model:'308', type:'combustion', consumption:5.6 },
+  { brand:'Peugeot', model:'2008', type:'combustion', consumption:5.8 },
+  { brand:'Opel', model:'Corsa', type:'combustion', consumption:5.3 },
+  { brand:'Opel', model:'Astra', type:'combustion', consumption:5.7 },
+  { brand:'Citroën', model:'C3', type:'combustion', consumption:5.4 },
+  { brand:'Dacia', model:'Sandero', type:'combustion', consumption:5.6 },
+  { brand:'Dacia', model:'Duster', type:'combustion', consumption:6.4 },
+  { brand:'Toyota', model:'Corolla Hybrid', type:'combustion', consumption:4.3 },
+  { brand:'Toyota', model:'Yaris Hybrid', type:'combustion', consumption:3.8 },
+  { brand:'Toyota', model:'C-HR Hybrid', type:'combustion', consumption:4.6 },
+  { brand:'Hyundai', model:'i20', type:'combustion', consumption:5.2 },
+  { brand:'Hyundai', model:'Tucson', type:'combustion', consumption:6.5 },
+  { brand:'Kia', model:'Ceed', type:'combustion', consumption:5.7 },
+  { brand:'Kia', model:'Sportage', type:'combustion', consumption:6.3 },
+  { brand:'Nissan', model:'Qashqai', type:'combustion', consumption:6.1 },
+  { brand:'Ford', model:'Fiesta', type:'combustion', consumption:5.3 },
+  { brand:'Ford', model:'Focus', type:'combustion', consumption:5.8 },
+  { brand:'BMW', model:'Serie 1', type:'combustion', consumption:6.0 },
+  { brand:'BMW', model:'Serie 3', type:'combustion', consumption:6.4 },
+  { brand:'Audi', model:'A3', type:'combustion', consumption:5.9 },
+  { brand:'Mercedes', model:'Clase A', type:'combustion', consumption:6.1 },
+  { brand:'Tesla', model:'Model 3', type:'electric', consumption:14.9 },
+  { brand:'Tesla', model:'Model Y', type:'electric', consumption:16.9 },
+  { brand:'MG', model:'MG4 Electric', type:'electric', consumption:16.0 }
+];
 
 let map;
 let radares = [];
@@ -761,6 +845,20 @@ muteBtn.addEventListener('click', () => {
   muteBtn.textContent = voiceMuted ? '🔇' : '🔊';
   muteBtn.classList.toggle('muted-state', voiceMuted);
   if (voiceMuted) window.speechSynthesis.cancel();
+});
+
+/* Compartir viaje en vivo: usa el share sheet nativo del móvil si existe (Web Share API);
+   si no, abre WhatsApp Web con el texto pre-rellenado. Todo client-side, sin backend. */
+document.getElementById('shareTripBtn').addEventListener('click', async () => {
+  if (!selectedDestination) return;
+  const mapsLink = `https://www.google.com/maps?q=${currentPos.lat.toFixed(5)},${currentPos.lon.toFixed(5)}`;
+  const text = `🚗 Voy hacia ${selectedDestination.name}. Llegada estimada: ${navArrival.textContent} (quedan ${navDistLeft.textContent}).\nMi posición ahora: ${mapsLink}`;
+  if (navigator.share){
+    try{ await navigator.share({ title: 'Mi viaje — Oráculo Vía', text }); }
+    catch(e){ /* usuario canceló el share, sin problema */ }
+  } else {
+    window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
+  }
 });
 
 /* ============================================================
@@ -930,30 +1028,66 @@ function normalizeRadar(r){
   const note = r.note ?? tags.note ?? null;
   return {
     lat: parseFloat(r.lat), lon: parseFloat(r.lon),
-    velocidad: velocidad || null, tipo, direction: direction != null ? parseFloat(direction) : null, note
+    velocidad: velocidad || null, tipo, direction: direction != null ? parseFloat(direction) : null, note,
+    categoria: classifyRadar(r, tags, note)
   };
 }
+
+/* Clasifica en FIJO / MOVIL / TRAMO / SEMAFORO / OTRO mirando varias convenciones de
+   etiquetado habituales en datasets OSM de radares (enforcement, mobile, traffic_signals)
+   y, si no hay tag claro, buscando palabras clave en la nota. Si tu radares.json usa otros
+   nombres de campo, dime un ejemplo y ajusto esto en un momento. */
+function classifyRadar(r, tags, note){
+  const noteUp = (note || '').toUpperCase();
+  const enforcement = (tags.enforcement || r.enforcement || '').toLowerCase();
+
+  if (enforcement === 'average_speed' || tags['maxspeed:type'] === 'section' || noteUp.includes('TRAMO') || noteUp.includes('SECCION')) return 'TRAMO';
+  if (tags.mobile === 'yes' || r.movil === true || noteUp.includes('MOVIL') || noteUp.includes('MÓVIL')) return 'MOVIL';
+  if (tags.highway === 'traffic_signals' || tags.traffic_signals || noteUp.includes('SEMAFORO') || noteUp.includes('SEMÁFORO')) return 'SEMAFORO';
+  if ((tags.highway || r.tipo) === 'speed_camera' || enforcement === 'maxspeed') return 'FIJO';
+  return 'OTRO';
+}
+
+const RADAR_CATS = ['FIJO','MOVIL','TRAMO','SEMAFORO','OTRO'];
+const RADAR_CAT_META = {
+  FIJO:     { color:'#ff3d1f', icon:'📷', label:'Radar fijo' },
+  MOVIL:    { color:'#ffab00', icon:'🚔', label:'Radar móvil' },
+  TRAMO:    { color:'#0091d6', icon:'📏', label:'Control de tramo' },
+  SEMAFORO: { color:'#7c5cff', icon:'🚦', label:'Semáforo / foto roja' },
+  OTRO:     { color:'#9aa3b2', icon:'⚠️', label:'Otro control' }
+};
+let visibleRadarTypes = new Set(RADAR_CATS); // todos visibles por defecto
 
 function radaresToGeoJSON(list){
   return {
     type: 'FeatureCollection',
-    features: list.map((r, index) => {
-      const n = normalizeRadar(r);
-      return {
+    features: list
+      .map((r, index) => ({ r, index, n: normalizeRadar(r) }))
+      .filter(({ n }) => visibleRadarTypes.has(n.categoria))
+      .map(({ index, n }) => ({
         type: 'Feature',
         geometry: { type: 'Point', coordinates: [n.lon, n.lat] },
-        properties: { idx: index, tipo: n.tipo, vel: n.velocidad || '?' }
-      };
-    })
+        properties: { idx: index, tipo: n.tipo, cat: n.categoria, vel: n.velocidad || '?' }
+      }))
   };
 }
 
 function radarColorExpr(){
-  return ['match', ['get','tipo'],
-    'RADAR_MOVIL', '#ffab00',
-    'SEMAFORO', '#7c5cff',
-    'TRAMO', '#0091d6',
-    /* default */ '#ff3d1f'
+  return ['match', ['get','cat'],
+    'MOVIL', RADAR_CAT_META.MOVIL.color,
+    'TRAMO', RADAR_CAT_META.TRAMO.color,
+    'SEMAFORO', RADAR_CAT_META.SEMAFORO.color,
+    'OTRO', RADAR_CAT_META.OTRO.color,
+    /* default FIJO */ RADAR_CAT_META.FIJO.color
+  ];
+}
+function radarIconExpr(){
+  return ['match', ['get','cat'],
+    'MOVIL', RADAR_CAT_META.MOVIL.icon,
+    'TRAMO', RADAR_CAT_META.TRAMO.icon,
+    'SEMAFORO', RADAR_CAT_META.SEMAFORO.icon,
+    'OTRO', RADAR_CAT_META.OTRO.icon,
+    /* default FIJO */ RADAR_CAT_META.FIJO.icon
   ];
 }
 
@@ -1002,7 +1136,7 @@ function setupRadaresClusterLayer(){
   });
   map.addLayer({
     id: 'radares-icon', type: 'symbol', source: 'radares-src', filter: ['!', ['has','point_count']], minzoom: 12.5,
-    layout: { 'text-field': '📷', 'text-size': ['interpolate',['linear'],['zoom'],12.5,10,17,15], 'text-allow-overlap': true }
+    layout: { 'text-field': radarIconExpr(), 'text-size': ['interpolate',['linear'],['zoom'],12.5,10,17,15], 'text-allow-overlap': true }
   });
   map.addLayer({
     id: 'radares-label', type: 'symbol', source: 'radares-src', filter: ['!', ['has','point_count']], minzoom: 14.2,
@@ -1045,24 +1179,24 @@ function showRadarPopup(e){
   const r = radares[idx];
   if (!r) return;
   const n = normalizeRadar(r);
+  const meta = RADAR_CAT_META[n.categoria] || RADAR_CAT_META.OTRO;
   const coords = e.features[0].geometry.coordinates.slice();
   const dist = Math.round(getDistanceMeters(currentPos.lat, currentPos.lon, n.lat, n.lon));
   const rows = flattenForPopup(r).map(([k,v]) => `<tr><td>${k}</td><td>${v}</td></tr>`).join('');
   const html = `<div class="radar-popup">
-      <div class="popup-title">📷 ${n.tipo.replace(/_/g,' ')}${n.velocidad ? ' · ' + n.velocidad + ' km/h' : ''}</div>
+      <div class="popup-title" style="color:${meta.color};">${meta.icon} ${meta.label}${n.velocidad ? ' · ' + n.velocidad + ' km/h' : ''}</div>
       <table>${rows}<tr><td>Distancia</td><td>${dist} m</td></tr></table>
     </div>`;
   new maplibregl.Popup({ closeButton: true, offset: 14 }).setLngLat(coords).setHTML(html).addTo(map);
 }
 
-/* Radares en la ruta activa: SIEMPRE visibles todos, sin importar el zoom */
+/* Radares en la ruta activa: SIEMPRE visibles todos (los tipos activados en Ajustes), sin importar el zoom */
 function setRouteHighlightRadares(indices){
-  const feats = indices.map(i => {
-    const r = radares[i];
-    const n = normalizeRadar(r);
-    return { type:'Feature', geometry:{ type:'Point', coordinates:[n.lon, n.lat] },
-      properties:{ idx:i, tipo:n.tipo, vel:n.velocidad || '?' } };
-  });
+  const feats = indices
+    .map(i => ({ i, n: normalizeRadar(radares[i]) }))
+    .filter(({ n }) => visibleRadarTypes.has(n.categoria))
+    .map(({ i, n }) => ({ type:'Feature', geometry:{ type:'Point', coordinates:[n.lon, n.lat] },
+      properties:{ idx:i, tipo:n.tipo, cat:n.categoria, vel:n.velocidad || '?' } }));
   const data = { type:'FeatureCollection', features: feats };
 
   if (map.getSource('route-radares-src')){
@@ -1078,7 +1212,7 @@ function setRouteHighlightRadares(indices){
     });
     map.addLayer({
       id:'route-radares-icon', type:'symbol', source:'route-radares-src',
-      layout:{ 'text-field':'📷', 'text-size':['interpolate',['linear'],['zoom'],7,10,16,16], 'text-allow-overlap':true }
+      layout:{ 'text-field': radarIconExpr(), 'text-size':['interpolate',['linear'],['zoom'],7,10,16,16], 'text-allow-overlap':true }
     });
     map.addLayer({
       id:'route-radares-label', type:'symbol', source:'route-radares-src', minzoom: 12,
@@ -1095,7 +1229,14 @@ function clearRouteHighlightRadares(){
 }
 
 /* ============================================================
-   BÚSQUEDA — con ámbito geográfico (país actual)
+   BÚSQUEDA — motor tipo Google/Waze
+   Nominatim (el que usábamos) está pensado para geocodificar direcciones
+   completas, no para autocompletar mientras escribes: no hace "prefix
+   matching", así que con la mitad de una palabra no encuentra nada.
+   Photon (motor de Komoot, Elasticsearch sobre OSM) SÍ hace autocompletado
+   real y permite priorizar por cercanía (lat/lon) sin excluir país — igual
+   que hacen Google/Waze. Lo usamos como buscador principal y dejamos
+   Nominatim como red de seguridad si Photon no responde.
    ============================================================ */
 async function reverseGeocodeCountry(lat, lon){
   try{
@@ -1113,7 +1254,7 @@ worldwideToggle.addEventListener('click', () => {
   worldwideSearch = !worldwideSearch;
   worldwideToggle.classList.toggle('on', worldwideSearch);
   scopeCountryLabel.textContent = worldwideSearch ? 'todo el mundo' : (userCountryName || 'tu zona');
-  if (destInput.value.trim().length >= 3) doSearch(destInput.value.trim());
+  if (destInput.value.trim().length >= 2) doSearch(destInput.value.trim());
 });
 
 let searchDebounce;
@@ -1121,27 +1262,73 @@ destInput.addEventListener('input', (e) => {
   const q = e.target.value.trim();
   searchClear.style.display = q.length ? 'block' : 'none';
   clearTimeout(searchDebounce);
-  if (q.length < 3){ searchResults.style.display = 'none'; searchEmpty.style.display = 'none'; return; }
-  searchDebounce = setTimeout(() => doSearch(q), 380);
+  if (q.length < 2){ searchResults.style.display = 'none'; searchEmpty.style.display = 'none'; return; }
+  searchDebounce = setTimeout(() => doSearch(q), 280);
 });
 searchClear.addEventListener('click', () => {
   destInput.value = ''; searchClear.style.display = 'none';
   searchResults.style.display = 'none'; searchEmpty.style.display = 'none';
 });
 
-async function doSearch(query){
-  try{
-    let url = `https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&limit=8&q=${encodeURIComponent(query)}`;
-    if (!worldwideSearch && userCountryCode) url += `&countrycodes=${userCountryCode}`;
-    const d = 3.0;
-    url += `&viewbox=${currentPos.lon-d},${currentPos.lat+d},${currentPos.lon+d},${currentPos.lat-d}&bounded=0`;
-    const res = await fetch(url);
-    let data = await res.json();
-    data.forEach(p => { p._dist = getDistanceMeters(currentPos.lat, currentPos.lon, parseFloat(p.lat), parseFloat(p.lon)); });
-    data.sort((a,b) => a._dist - b._dist);
-    renderSearchResults(data);
-  }catch(err){ console.error(err); }
+function photonToResult(f){
+  const p = f.properties || {};
+  const lon = f.geometry.coordinates[0], lat = f.geometry.coordinates[1];
+  let main = p.name || [p.street, p.housenumber].filter(Boolean).join(' ') || p.street || p.city || 'Ubicación';
+  const subParts = [];
+  if (p.name && p.street) subParts.push(p.housenumber ? `${p.street} ${p.housenumber}` : p.street);
+  if (p.city && p.city !== main) subParts.push(p.city);
+  else if (p.district && p.district !== main) subParts.push(p.district);
+  if (p.state) subParts.push(p.state);
+  if (p.country) subParts.push(p.country);
+  return { name: main, sub: subParts.join(', '), lat, lon, countrycode: (p.countrycode || '').toLowerCase() };
 }
+function nominatimToResult(place){
+  return {
+    name: place.display_name.split(',')[0],
+    sub: place.display_name.split(',').slice(1,3).join(',').trim(),
+    lat: parseFloat(place.lat), lon: parseFloat(place.lon),
+    countrycode: (place.address && place.address.country_code || '').toLowerCase()
+  };
+}
+
+async function searchPhoton(query, strongBias){
+  const bias = strongBias ? '&location_bias_scale=0.9&zoom=15' : '&zoom=10';
+  const url = `https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&lat=${currentPos.lat}&lon=${currentPos.lon}&limit=10&lang=es${bias}`;
+  const res = await fetch(url);
+  const data = await res.json();
+  return (data.features || []).map(photonToResult);
+}
+async function searchNominatimFallback(query, strongBias){
+  let url = `https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&limit=8&q=${encodeURIComponent(query)}`;
+  if (!worldwideSearch && userCountryCode) url += `&countrycodes=${userCountryCode}`;
+  const d = strongBias ? 0.15 : 3.0;
+  url += `&viewbox=${currentPos.lon-d},${currentPos.lat+d},${currentPos.lon+d},${currentPos.lat-d}&bounded=${strongBias?1:0}`;
+  const res = await fetch(url);
+  const data = await res.json();
+  return data.map(nominatimToResult);
+}
+
+async function runSearch(query, strongBias){
+  let results = [];
+  try{ results = await searchPhoton(query, strongBias); }
+  catch(e){ console.warn('Photon falló, usando Nominatim:', e); }
+  if (!results.length){
+    try{ results = await searchNominatimFallback(query, strongBias); }catch(e){ console.error(e); }
+  }
+
+  results.forEach(r => { r.dist = getDistanceMeters(currentPos.lat, currentPos.lon, r.lat, r.lon); });
+  results.sort((a,b) => a.dist - b.dist);
+
+  if (!worldwideSearch && userCountryCode){
+    const filtered = results.filter(r => !r.countrycode || r.countrycode === userCountryCode);
+    // Si filtrar por país nos deja sin nada útil, mejor mostrar los resultados
+    // "de fuera" que dejar al usuario sin resultados (eso era justo la queja).
+    if (filtered.length > 0) results = filtered;
+  }
+  return results;
+}
+
+async function doSearch(query){ renderSearchResults(await runSearch(query, false)); }
 
 function renderSearchResults(data){
   searchResults.innerHTML = '';
@@ -1149,13 +1336,11 @@ function renderSearchResults(data){
   searchEmpty.style.display = 'none';
   searchResults.style.display = 'flex';
   data.forEach(place => {
-    const main = place.display_name.split(',')[0];
-    const sub = place.display_name.split(',').slice(1,3).join(',').trim();
-    const distKm = place._dist ? (place._dist/1000).toFixed(place._dist < 10000 ? 1 : 0) : null;
+    const distKm = place.dist ? (place.dist/1000).toFixed(place.dist < 10000 ? 1 : 0) : null;
     const div = document.createElement('div');
     div.className = 'search-result-item';
     div.innerHTML = `<div class="result-icon">📍</div>
-      <div class="result-text"><div class="result-main">${main}</div><div class="result-sub">${sub}</div></div>
+      <div class="result-text"><div class="result-main">${place.name}</div><div class="result-sub">${place.sub}</div></div>
       ${distKm ? `<div class="result-dist">${distKm} km</div>` : ''}`;
     div.onclick = () => selectDestination(place);
     searchResults.appendChild(div);
@@ -1169,17 +1354,7 @@ document.getElementById('chipWork').addEventListener('click', () => alert('Guard
 
 async function quickPoiSearch(term){
   destInput.value = term; searchClear.style.display = 'block';
-  const d = 0.15;
-  let url = `https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&limit=8&q=${encodeURIComponent(term)}`;
-  if (!worldwideSearch && userCountryCode) url += `&countrycodes=${userCountryCode}`;
-  url += `&viewbox=${currentPos.lon-d},${currentPos.lat+d},${currentPos.lon+d},${currentPos.lat-d}&bounded=1`;
-  try{
-    const res = await fetch(url);
-    const data = await res.json();
-    data.forEach(p => { p._dist = getDistanceMeters(currentPos.lat, currentPos.lon, parseFloat(p.lat), parseFloat(p.lon)); });
-    data.sort((a,b) => a._dist - b._dist);
-    renderSearchResults(data);
-  }catch(e){ console.error(e); }
+  renderSearchResults(await runSearch(term, true));
 }
 
 /* ============================================================
@@ -1190,7 +1365,7 @@ async function selectDestination(place){
   searchResults.style.display = 'none';
   searchSheet.style.display = 'none';
 
-  selectedDestination = { name: place.display_name.split(',')[0], lat: parseFloat(place.lat), lon: parseFloat(place.lon) };
+  selectedDestination = { name: place.name, lat: place.lat, lon: place.lon };
 
   previewTitle.textContent = selectedDestination.name;
   previewMetrics.textContent = 'Calculando ruta…';
@@ -1230,11 +1405,18 @@ function renderVariantChips(){
   if (routesData.length < 2){ routeVariants.style.display = 'none'; return; }
   routeVariants.style.display = 'flex';
   routeVariants.innerHTML = '';
+  let cheapestIdx = 0, cheapestCost = Infinity;
+  routesData.forEach((r, i) => {
+    const cost = estimateFuelCost(r.distance/1000);
+    if (cost < cheapestCost){ cheapestCost = cost; cheapestIdx = i; }
+  });
   routesData.forEach((r, i) => {
     const mins = Math.round(r.duration/60), km = (r.distance/1000).toFixed(1);
+    const cost = estimateFuelCost(r.distance/1000);
     const chip = document.createElement('div');
     chip.className = 'variant-chip' + (i === selectedRouteIdx ? ' selected' : '');
-    chip.innerHTML = `${i === 0 ? 'Ruta principal' : 'Alternativa ' + i}<small>${mins} min · ${km} km</small>`;
+    const label = (i === 0 ? 'Ruta principal' : 'Alternativa ' + i) + (i === cheapestIdx ? ' 🌱' : '');
+    chip.innerHTML = `${label}<small>${mins} min · ${km} km · ${cost.toFixed(2)}€</small>`;
     chip.onclick = () => { selectedRouteIdx = i; renderVariantChips(); applySelectedRoute(); };
     routeVariants.appendChild(chip);
   });
@@ -1324,6 +1506,7 @@ function markRadaresOnRoute(coords){
   const candidates = [];
   radares.forEach((r, index) => {
     const n = normalizeRadar(r);
+    if (!visibleRadarTypes.has(n.categoria)) return;
     if (n.lat >= minLat && n.lat <= maxLat && n.lon >= minLon && n.lon <= maxLon){
       candidates.push({ index, lat: n.lat, lon: n.lon });
     }
@@ -1509,6 +1692,7 @@ function checkProximity(lat, lon){
   let minDist = Infinity, closest = null, closestNorm = null;
   for (let i = 0; i < radares.length; i++){
     const n = normalizeRadar(radares[i]);
+    if (!visibleRadarTypes.has(n.categoria)) continue;
     if (!isRadarRelevantForHeading(n.direction, currentPos.heading, currentPos.speed)) continue;
     const d = getDistanceMeters(lat, lon, n.lat, n.lon);
     if (d < minDist){ minDist = d; closest = radares[i]; closestNorm = n; }
@@ -1813,7 +1997,34 @@ document.querySelectorAll('#themeSegmented button').forEach(btn => {
   });
 });
 
+// modo parabrisas
+let windshieldMode = false;
+const windshieldSwitch = document.getElementById('windshieldSwitch');
+windshieldSwitch.addEventListener('click', () => {
+  windshieldMode = !windshieldMode;
+  windshieldSwitch.classList.toggle('on', windshieldMode);
+  document.body.classList.toggle('windshield-mode', windshieldMode);
+});
+
 // swatches de color
+// tipos de radar visibles
+const radarTypeTogglesEl = document.getElementById('radarTypeToggles');
+RADAR_CATS.forEach(cat => {
+  const meta = RADAR_CAT_META[cat];
+  const row = document.createElement('div');
+  row.className = 'toggle-row';
+  row.style.marginBottom = '10px';
+  row.innerHTML = `<div class="label" style="color:${meta.color};">${meta.icon} ${meta.label}</div><div class="switch on" id="radarToggle_${cat}"></div>`;
+  radarTypeTogglesEl.appendChild(row);
+  const sw = row.querySelector(`#radarToggle_${cat}`);
+  sw.addEventListener('click', () => {
+    if (visibleRadarTypes.has(cat)) visibleRadarTypes.delete(cat); else visibleRadarTypes.add(cat);
+    sw.classList.toggle('on', visibleRadarTypes.has(cat));
+    if (map && radares.length) setupRadaresClusterLayer();
+    if (routeCoords.length) markRadaresOnRoute(routeCoords);
+  });
+});
+
 const markerColorRow = document.getElementById('markerColorRow');
 MARKER_COLORS.forEach((c, i) => {
   const sw = document.createElement('div');
@@ -1871,6 +2082,41 @@ updateCopilotPreview();
 const vehicleTypeSegmented = document.getElementById('vehicleTypeSegmented');
 const vehicleConsumptionInput = document.getElementById('vehicleConsumptionInput');
 const vehiclePriceInput = document.getElementById('vehiclePriceInput');
+
+const carPresetSelect = document.getElementById('carPresetSelect');
+const brandsSorted = [...new Set(CAR_PRESETS.map(c => c.brand))].sort();
+brandsSorted.forEach(brand => {
+  const group = document.createElement('optgroup');
+  group.label = brand;
+  CAR_PRESETS.filter(c => c.brand === brand).forEach(c => {
+    const opt = document.createElement('option');
+    opt.value = `${c.brand}|${c.model}`;
+    opt.textContent = `${c.model}${c.type === 'electric' ? ' ⚡' : ''}`;
+    group.appendChild(opt);
+  });
+  carPresetSelect.appendChild(group);
+});
+carPresetSelect.addEventListener('change', () => {
+  if (!carPresetSelect.value) return;
+  const [brand, model] = carPresetSelect.value.split('|');
+  const preset = CAR_PRESETS.find(c => c.brand === brand && c.model === model);
+  if (!preset) return;
+  vehicleType = preset.type;
+  vehicleTypeSegmented.querySelectorAll('button').forEach(b => b.classList.toggle('active', b.dataset.val === preset.type));
+  vehicleConsumption = preset.consumption;
+  if (preset.type === 'electric'){
+    vehicleConsumptionInput.min = 8; vehicleConsumptionInput.max = 35; vehicleConsumptionInput.step = 0.5;
+    vehiclePriceInput.min = 0.05; vehiclePriceInput.max = 0.60; vehiclePriceInput.step = 0.01;
+    if (vehiclePrice > 0.60) vehiclePrice = 0.15;
+  } else {
+    vehicleConsumptionInput.min = 2; vehicleConsumptionInput.max = 20; vehicleConsumptionInput.step = 0.5;
+    vehiclePriceInput.min = 0.50; vehiclePriceInput.max = 2.50; vehiclePriceInput.step = 0.05;
+    if (vehiclePrice < 0.50) vehiclePrice = 1.65;
+  }
+  vehicleConsumptionInput.value = vehicleConsumption;
+  vehiclePriceInput.value = vehiclePrice;
+  updateVehicleUnitLabels();
+});
 function updateVehicleUnitLabels(){
   const unit = vehicleType === 'electric' ? 'kWh/100km' : 'L/100km';
   const priceUnit = vehicleType === 'electric' ? '€/kWh' : '€/L';
@@ -1882,6 +2128,7 @@ vehicleTypeSegmented.querySelectorAll('button').forEach(btn => {
     vehicleTypeSegmented.querySelectorAll('button').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
     vehicleType = btn.dataset.val;
+    carPresetSelect.value = '';
     if (vehicleType === 'electric'){
       vehicleConsumptionInput.min = 8; vehicleConsumptionInput.max = 35; vehicleConsumptionInput.step = 0.5; vehicleConsumptionInput.value = vehicleConsumption = 18;
       vehiclePriceInput.min = 0.05; vehiclePriceInput.max = 0.60; vehiclePriceInput.step = 0.01; vehiclePriceInput.value = vehiclePrice = 0.15;
@@ -1892,7 +2139,7 @@ vehicleTypeSegmented.querySelectorAll('button').forEach(btn => {
     updateVehicleUnitLabels();
   });
 });
-vehicleConsumptionInput.addEventListener('input', (e) => { vehicleConsumption = parseFloat(e.target.value); updateVehicleUnitLabels(); });
+vehicleConsumptionInput.addEventListener('input', (e) => { vehicleConsumption = parseFloat(e.target.value); carPresetSelect.value=''; updateVehicleUnitLabels(); });
 vehiclePriceInput.addEventListener('input', (e) => { vehiclePrice = parseFloat(e.target.value); updateVehicleUnitLabels(); });
 updateVehicleUnitLabels();
 
@@ -1915,6 +2162,31 @@ function openStats(){
 function closeStats(){ statsBackdrop.style.display = 'none'; statsSheet.style.display = 'none'; clearInterval(statsLiveInterval); }
 document.getElementById('statsBtn').addEventListener('click', openStats);
 document.getElementById('statsCloseBtn').addEventListener('click', closeStats);
+
+/* Exportar historial: todo client-side (Blob + <a download>), sin backend */
+function downloadBlob(content, filename, mime){
+  const blob = new Blob([content], { type: mime });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename; document.body.appendChild(a); a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
+}
+document.getElementById('exportJsonBtn').addEventListener('click', () => {
+  if (!tripHistory.length){ alert('Todavía no hay viajes guardados.'); return; }
+  downloadBlob(JSON.stringify(tripHistory, null, 2), 'oraculo_via_viajes.json', 'application/json');
+});
+document.getElementById('exportCsvBtn').addEventListener('click', () => {
+  if (!tripHistory.length){ alert('Todavía no hay viajes guardados.'); return; }
+  const headers = ['fecha','destino','completado','distancia_km','duracion_min','vel_media_kmh','vel_maxima_kmh','excesos_nivel1','excesos_nivel2','min_en_exceso','min_muy_lento','acelerones','frenazos','coste_estimado_eur'];
+  const rows = tripHistory.map(t => [
+    t.date.toISOString(), `"${t.destination.replace(/"/g,'')}"`, t.completed ? 'si' : 'no',
+    t.distanceKm.toFixed(2), (t.durationMs/60000).toFixed(1), Math.round(t.avgSpeed), Math.round(t.maxSpeed),
+    t.lvl1Events, t.lvl2Events, (t.timeOverLimitMs/60000).toFixed(1), (t.timeUnderPaceMs/60000).toFixed(1),
+    t.harshAccelCount, t.harshBrakeCount, t.fuelCost.toFixed(2)
+  ].join(','));
+  downloadBlob(headers.join(',') + '\n' + rows.join('\n'), 'oraculo_via_viajes.csv', 'text/csv');
+});
 statsBackdrop.addEventListener('click', closeStats);
 
 function tripStatRowHTML(t, live){
