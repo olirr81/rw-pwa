@@ -305,6 +305,25 @@ body.theme-day .segmented button.active{ color:#fff; }
 .copilot-preview b{ color:var(--text); }
 .divider{ height:1px; background:var(--border); margin:2px 0; }
 
+/* ---------- ESTADÍSTICAS DE VIAJE ---------- */
+.trip-card{ background:var(--surface-2); border:1px solid var(--border); border-radius:16px; padding:14px; margin-bottom:10px; }
+.trip-card-head{ display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; }
+.trip-card-title{ font-weight:700; font-size:0.92rem; }
+.trip-card-date{ font-size:0.68rem; color:var(--text-muted); }
+.trip-badge{ font-size:0.62rem; padding:3px 8px; border-radius:10px; font-weight:700; }
+.trip-badge.completed{ background:rgba(0,230,118,0.14); color:var(--success); }
+.trip-badge.partial{ background:rgba(255,171,0,0.16); color:var(--warn); }
+.trip-stat-grid{ display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-bottom:10px; }
+.trip-stat{ background:var(--surface); border:1px solid var(--border); border-radius:11px; padding:8px 6px; text-align:center; }
+.trip-stat .v{ font-family:'JetBrains Mono'; font-weight:800; font-size:0.95rem; }
+.trip-stat .l{ font-size:0.56rem; color:var(--text-muted); text-transform:uppercase; margin-top:1px; }
+.trip-stat.warn .v{ color:var(--warn); }
+.trip-stat.danger .v{ color:var(--danger); }
+.trip-stat.good .v{ color:var(--success); }
+.trip-cost-row{ display:flex; justify-content:space-between; align-items:center; padding:9px 12px; background:var(--accent-dim); border-radius:11px; font-size:0.8rem; }
+.trip-cost-row b{ font-family:'JetBrains Mono'; color:var(--accent); font-size:0.95rem; }
+.trip-history-toggle{ text-align:center; font-size:0.72rem; color:var(--text-muted); cursor:pointer; padding:6px 0 0 0; }
+
 /* ---------- misc ---------- */
 .user-location-marker{ width:36px; height:36px; display:flex; align-items:center; justify-content:center; }
 .user-arrow-glow{ position:absolute; width:36px; height:36px; border-radius:50%; }
@@ -371,6 +390,7 @@ body.theme-day .segmented button.active{ color:#fff; }
 
   <div class="map-controls" id="mapControls">
     <button id="settingsBtn" class="ctrl-btn">⚙️</button>
+    <button id="statsBtn" class="ctrl-btn">📊</button>
     <div class="zoom-cluster glass">
       <button id="zoomInBtn">+</button>
       <button id="zoomOutBtn">−</button>
@@ -524,6 +544,54 @@ body.theme-day .segmented button.active{ color:#fff; }
         <div class="copilot-preview" id="copilotPreview"></div>
       </div>
     </div>
+
+    <div class="divider"></div>
+
+    <div class="settings-section">
+      <div class="settings-section-title">🚘 Vehículo y consumo (para estimar el coste del viaje)</div>
+      <div class="segmented" id="vehicleTypeSegmented">
+        <button data-val="combustion" class="active">⛽ Combustión</button>
+        <button data-val="electric">🔌 Eléctrico</button>
+      </div>
+      <div class="field-row">
+        <div class="field-label">Consumo medio <b id="vehicleConsumptionVal">6.5 L/100km</b></div>
+        <input type="range" id="vehicleConsumptionInput" min="2" max="20" step="0.5" value="6.5">
+      </div>
+      <div class="field-row">
+        <div class="field-label">Precio <b id="vehiclePriceVal">1.65 €/L</b></div>
+        <input type="range" id="vehiclePriceInput" min="0.05" max="2.50" step="0.05" value="1.65">
+      </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="settings-section">
+      <div class="settings-section-title">Mantenimiento</div>
+      <div class="toggle-row">
+        <div>
+          <div class="label">🔄 Reiniciar capas del mapa</div>
+          <div class="sub">Si los radares o la ruta dejan de verse bien, pulsa aquí</div>
+        </div>
+        <button class="settings-close" id="resetMapBtn" style="width:auto;border-radius:12px;padding:8px 14px;font-size:0.8rem;">Reiniciar</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="settings-backdrop" id="statsBackdrop"></div>
+  <div class="settings-sheet" id="statsSheet">
+    <div class="settings-header">
+      <h2>📊 Estadísticas de conducción</h2>
+      <button class="settings-close" id="statsCloseBtn">✕</button>
+    </div>
+    <div id="liveTripSection" style="display:none;">
+      <div class="settings-section-title">Viaje en curso</div>
+      <div id="liveTripCard"></div>
+    </div>
+    <div class="settings-section">
+      <div class="settings-section-title">Historial de viajes</div>
+      <div id="tripHistoryList"></div>
+      <div class="copilot-preview" id="tripHistoryEmpty">Aún no hay viajes registrados. Completa una ruta para ver aquí tu detalle: excesos de velocidad, acelerones, frenazos, y coste estimado de combustible.</div>
+    </div>
   </div>
 
 </div>
@@ -595,6 +663,17 @@ let copilotLvl2Pct = 8, copilotLvl2Sec = 5;
 let overLvl1Since = null, overLvl1Fired = false;
 let overLvl2Since = null, overLvl2Fired = false;
 let nearestRadarObj = null, nearestRadarDist = Infinity;
+
+/* ---- estadísticas de viaje ---- */
+let tripStats = null;      // viaje en curso
+let tripHistory = [];      // viajes finalizados (memoria de la sesión)
+let lastStatsTickTime = null;
+let lastStatsTickPos = null;
+
+/* ---- vehículo / coste estimado ---- */
+let vehicleType = 'combustion'; // combustion | electric
+let vehicleConsumption = 6.5;   // L/100km ó kWh/100km según vehicleType
+let vehiclePrice = 1.65;        // €/L ó €/kWh según vehicleType
 
 /* ---------- DOM refs ---------- */
 const destInput = document.getElementById('destInput');
@@ -730,7 +809,12 @@ function applyTheme(isDay){
   if (currentStyleIsDay === isDay) return;
   currentStyleIsDay = isDay;
   const target = isDay ? LIGHT_STYLE : DARK_STYLE;
-  map.once('style.load', rebuildDynamicLayers);
+  // Redundante a propósito: setStyle() borra TODAS las fuentes/capas propias, y el
+  // evento 'style.load' a veces no basta por sí solo para garantizar que las
+  // reconstruimos a tiempo. Nos cubrimos con tres disparadores independientes.
+  map.once('style.load', forceRebuildAllLayers);
+  map.once('idle', forceRebuildAllLayers);
+  setTimeout(forceRebuildAllLayers, 900);
   map.setStyle(target);
 }
 function evaluateTheme(){
@@ -800,8 +884,18 @@ function setInitialPosition(lat, lon, heading){
   userMarker.setLngLat([lon, lat]);
 }
 
-/* Reconstruye capas dinámicas tras un cambio de estilo (día/noche) */
-function rebuildDynamicLayers(){
+/* Reconstrucción TOTAL de todo lo que no pertenece al estilo base (radares, rutas).
+   Idempotente: no pasa nada si se llama varias veces seguidas o si algo ya no existe.
+   Se usa tras cambios de tema Y como botón manual de "Reiniciar mapa" en Ajustes. */
+function forceRebuildAllLayers(){
+  if (!map || !map.isStyleLoaded()) return;
+  try{
+    ['route-radares-label','route-radares-icon','route-radares-badge',
+     'radares-label','radares-icon','radares-badge','cluster-count','cluster-icon','clusters',
+     'route-layer','route-glow','route-alt-layer'].forEach(l => { if (map.getLayer(l)) map.removeLayer(l); });
+    ['route-radares-src','radares-src','route-src','route-alt-src'].forEach(s => { if (map.getSource(s)) map.removeSource(s); });
+  }catch(e){ console.warn('Limpieza de capas incompleta:', e); }
+
   if (radares.length) setupRadaresClusterLayer();
   if (routeCoords.length && routesData.length){
     drawRoutes();
@@ -1212,14 +1306,42 @@ function markRadaresOnRoute(coords){
     clearRouteHighlightRadares();
     return;
   }
-  const routeIndices = [];
+
+  /* BUG ANTERIOR: se muestreaban sólo 250 puntos repartidos por TODA la ruta, así que
+     cuanto más larga era la ruta, más separados quedaban los puntos comprobados y más
+     radares se "colaban" entre medias sin ser detectados (por eso Cunit→Jonquera detectaba
+     más que el tramo compartido de Cunit→Annecy, mucho más largo).
+     Ahora: 1) acotamos candidatos a los que caen en el rectángulo de la ruta (+ margen),
+             2) comprobamos ESOS candidatos contra TODOS los puntos de la ruta, sin saltos. */
+  let minLat=90,maxLat=-90,minLon=180,maxLon=-180;
+  for (const c of coords){
+    if (c[1]<minLat) minLat=c[1]; if (c[1]>maxLat) maxLat=c[1];
+    if (c[0]<minLon) minLon=c[0]; if (c[0]>maxLon) maxLon=c[0];
+  }
+  const buf = 0.03; // ~3km de margen en grados
+  minLat-=buf; maxLat+=buf; minLon-=buf; maxLon+=buf;
+
+  const candidates = [];
   radares.forEach((r, index) => {
-    const rLat = parseFloat(r.lat), rLon = parseFloat(r.lon);
-    const step = Math.max(1, Math.floor(coords.length / 250));
-    for (let i = 0; i < coords.length; i += step){
-      if (getDistanceMeters(coords[i][1], coords[i][0], rLat, rLon) < 300){ routeIndices.push(index); break; }
+    const n = normalizeRadar(r);
+    if (n.lat >= minLat && n.lat <= maxLat && n.lon >= minLon && n.lon <= maxLon){
+      candidates.push({ index, lat: n.lat, lon: n.lon });
     }
   });
+
+  const routeIndices = [];
+  const found = new Set();
+  for (let i = 0; i < coords.length && found.size < candidates.length; i++){
+    const clat = coords[i][1], clon = coords[i][0];
+    for (const cand of candidates){
+      if (found.has(cand.index)) continue;
+      if (getDistanceMeters(clat, clon, cand.lat, cand.lon) < 300){
+        found.add(cand.index);
+        routeIndices.push(cand.index);
+      }
+    }
+  }
+
   setRouteHighlightRadares(routeIndices);
   if (routeIndices.length > 0){
     routeRadaresCount.textContent = `${routeIndices.length} radar${routeIndices.length>1?'es':''} detectado${routeIndices.length>1?'s':''} en tu camino`;
@@ -1239,6 +1361,7 @@ goRouteBtn.addEventListener('click', () => {
   isNavigating = true; userTracking = true; headingUpMode = true; arrivalHandled = false;
   announcedSteps = new Set(); lastAlerted500 = null; lastAlerted150 = null;
   overLvl1Since = null; overLvl1Fired = false; overLvl2Since = null; overLvl2Fired = false;
+  startTripStats();
 
   const radCount = document.getElementById('routeRadaresCount').textContent;
   speak(`Iniciando ruta hacia ${selectedDestination.name}. ${radCount}.`);
@@ -1274,6 +1397,7 @@ function stopNavigation(msg){
   destInput.value = ''; searchClear.style.display = 'none';
   if (msg) speak(msg);
   if (watchId !== null) navigator.geolocation.clearWatch(watchId);
+  if (tripStats) finalizeTripStats(false); // viaje detenido a mitad: se guarda como incompleto
   removeRouteLayers(); clearRouteHighlightRadares();
   routeCoords = []; routesData = []; routeAnnotationSpeeds = [];
   map.easeTo({ pitch: 0, bearing: 0, duration: 700 });
@@ -1318,6 +1442,7 @@ function updatePosition(lat, lon, speed, rawHeading){
   checkProximity(lat, lon);
   updateSpeedDial(speed, routeIdx);
   checkCopilot(speed, routeIdx);
+  if (isNavigating) tickTripStats(lat, lon, speed, routeIdx);
 
   if (isNavigating) updateNavProgress(lat, lon, progress);
 }
@@ -1436,6 +1561,7 @@ function checkCopilot(speed, routeIdx){
     if (!overLvl1Since) overLvl1Since = now;
     if (!overLvl1Fired && (now - overLvl1Since) >= copilotLvl1Sec*1000){
       overLvl1Fired = true;
+      if (tripStats) tripStats.lvl1Events++;
       if (copilotBeep) beep(900);
       showCopilotToast(`Nivel 1 · ${Math.round(speed)} km/h en zona de ${limit}`, false);
     }
@@ -1445,6 +1571,7 @@ function checkCopilot(speed, routeIdx){
     if (!overLvl2Since) overLvl2Since = now;
     if (!overLvl2Fired && (now - overLvl2Since) >= copilotLvl2Sec*1000){
       overLvl2Fired = true;
+      if (tripStats) tripStats.lvl2Events++;
       speak('¡Alerta! Suelta el pie.');
       speedDialWrap.classList.remove('flash-critical'); void speedDialWrap.offsetWidth; speedDialWrap.classList.add('flash-critical');
       showCopilotToast(`Nivel 2 · ¡Suelta el pie! ${Math.round(speed)} km/h`, true);
@@ -1459,6 +1586,89 @@ function showCopilotToast(text, critical){
   copilotToast.style.display = 'flex';
   clearTimeout(copilotToastTimer);
   copilotToastTimer = setTimeout(() => { copilotToast.style.display = 'none'; }, critical ? 3200 : 2200);
+}
+
+/* ============================================================
+   ESTADÍSTICAS DE VIAJE
+   ============================================================ */
+function startTripStats(){
+  tripStats = {
+    startTime: Date.now(),
+    destinationName: selectedDestination ? selectedDestination.name : 'Destino',
+    distanceMeters: 0,
+    maxSpeed: 0,
+    speedSum: 0, speedCount: 0,
+    lvl1Events: 0, lvl2Events: 0,
+    timeOverLimitMs: 0,
+    timeUnderPaceMs: 0,
+    harshAccelCount: 0, harshBrakeCount: 0,
+    lastAccelSpeed: 0
+  };
+  lastStatsTickTime = Date.now();
+  lastStatsTickPos = { lat: currentPos.lat, lon: currentPos.lon };
+}
+
+function tickTripStats(lat, lon, speed, routeIdx){
+  if (!tripStats) return;
+  const now = Date.now();
+  const dtSec = lastStatsTickTime ? Math.min(10, (now - lastStatsTickTime)/1000) : 0; // cap 10s por si hay saltos GPS
+
+  if (lastStatsTickPos){
+    const d = getDistanceMeters(lastStatsTickPos.lat, lastStatsTickPos.lon, lat, lon);
+    if (d > 2 && d < 400) tripStats.distanceMeters += d; // filtra ruido/saltos GPS
+  }
+  lastStatsTickPos = { lat, lon };
+
+  tripStats.maxSpeed = Math.max(tripStats.maxSpeed, speed);
+  tripStats.speedSum += speed; tripStats.speedCount++;
+
+  if (dtSec > 0){
+    const rate = (speed - tripStats.lastAccelSpeed) / dtSec; // km/h por segundo
+    if (rate >= 8) tripStats.harshAccelCount++;
+    if (rate <= -10) tripStats.harshBrakeCount++;
+  }
+  tripStats.lastAccelSpeed = speed;
+
+  if (speed >= 5){
+    const limit = getEffectiveLimit(routeIdx).value;
+    const overPct = ((speed/limit) - 1) * 100;
+    if (overPct >= copilotLvl1Pct) tripStats.timeOverLimitMs += dtSec*1000;
+    else if (speed < limit*0.6) tripStats.timeUnderPaceMs += dtSec*1000;
+  }
+
+  lastStatsTickTime = now;
+}
+
+function estimateFuelCost(distanceKm){
+  const units = distanceKm * (vehicleConsumption/100);
+  return units * vehiclePrice;
+}
+function formatDuration(ms){
+  const totalMin = Math.round(ms/60000);
+  if (totalMin < 60) return `${totalMin} min`;
+  return `${Math.floor(totalMin/60)}h ${totalMin%60}min`;
+}
+
+function finalizeTripStats(completed){
+  if (!tripStats) return;
+  const durationMs = Date.now() - tripStats.startTime;
+  const distanceKm = tripStats.distanceMeters/1000;
+  const avgSpeed = tripStats.speedCount ? (tripStats.speedSum/tripStats.speedCount) : 0;
+
+  tripHistory.unshift({
+    date: new Date(),
+    destination: tripStats.destinationName,
+    completed,
+    distanceKm, durationMs,
+    maxSpeed: tripStats.maxSpeed, avgSpeed,
+    lvl1Events: tripStats.lvl1Events, lvl2Events: tripStats.lvl2Events,
+    timeOverLimitMs: tripStats.timeOverLimitMs, timeUnderPaceMs: tripStats.timeUnderPaceMs,
+    harshAccelCount: tripStats.harshAccelCount, harshBrakeCount: tripStats.harshBrakeCount,
+    fuelCost: estimateFuelCost(distanceKm)
+  });
+  if (tripHistory.length > 20) tripHistory.pop();
+  tripStats = null;
+  renderStatsSheet();
 }
 
 /* ---------- progreso de ruta / maniobras / recálculo / llegada ---------- */
@@ -1563,6 +1773,7 @@ function handleArrival(){
   arrivalBanner.style.display = 'flex';
   document.getElementById('arrivalSub').textContent = selectedDestination ? selectedDestination.name : '';
   speak('Has llegado a tu destino. Buen viaje.');
+  finalizeTripStats(true);
   setTimeout(() => { arrivalBanner.style.display = 'none'; stopNavigation(null); }, 3200);
 }
 
@@ -1655,6 +1866,117 @@ function updateCopilotPreview(){
      <b>Límite de referencia (por prioridad):</b> 1) radar cercano (&lt;2km)${copilotUseRadarLimit ? '' : ' — desactivado'}; 2) velocidad estimada de la vía por OSRM mientras navegas; 3) genérico de ${copilotGenericLimit} km/h si no hay datos.`;
 }
 updateCopilotPreview();
+
+// vehículo / coste
+const vehicleTypeSegmented = document.getElementById('vehicleTypeSegmented');
+const vehicleConsumptionInput = document.getElementById('vehicleConsumptionInput');
+const vehiclePriceInput = document.getElementById('vehiclePriceInput');
+function updateVehicleUnitLabels(){
+  const unit = vehicleType === 'electric' ? 'kWh/100km' : 'L/100km';
+  const priceUnit = vehicleType === 'electric' ? '€/kWh' : '€/L';
+  document.getElementById('vehicleConsumptionVal').textContent = `${vehicleConsumption} ${unit}`;
+  document.getElementById('vehiclePriceVal').textContent = `${vehiclePrice.toFixed(2)} ${priceUnit}`;
+}
+vehicleTypeSegmented.querySelectorAll('button').forEach(btn => {
+  btn.addEventListener('click', () => {
+    vehicleTypeSegmented.querySelectorAll('button').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    vehicleType = btn.dataset.val;
+    if (vehicleType === 'electric'){
+      vehicleConsumptionInput.min = 8; vehicleConsumptionInput.max = 35; vehicleConsumptionInput.step = 0.5; vehicleConsumptionInput.value = vehicleConsumption = 18;
+      vehiclePriceInput.min = 0.05; vehiclePriceInput.max = 0.60; vehiclePriceInput.step = 0.01; vehiclePriceInput.value = vehiclePrice = 0.15;
+    } else {
+      vehicleConsumptionInput.min = 2; vehicleConsumptionInput.max = 20; vehicleConsumptionInput.step = 0.5; vehicleConsumptionInput.value = vehicleConsumption = 6.5;
+      vehiclePriceInput.min = 0.50; vehiclePriceInput.max = 2.50; vehiclePriceInput.step = 0.05; vehiclePriceInput.value = vehiclePrice = 1.65;
+    }
+    updateVehicleUnitLabels();
+  });
+});
+vehicleConsumptionInput.addEventListener('input', (e) => { vehicleConsumption = parseFloat(e.target.value); updateVehicleUnitLabels(); });
+vehiclePriceInput.addEventListener('input', (e) => { vehiclePrice = parseFloat(e.target.value); updateVehicleUnitLabels(); });
+updateVehicleUnitLabels();
+
+// reinicio manual del mapa (radares/rutas)
+document.getElementById('resetMapBtn').addEventListener('click', () => {
+  forceRebuildAllLayers();
+  showCopilotToast('Mapa reiniciado', false);
+});
+
+/* ---------- panel de estadísticas ---------- */
+const statsBackdrop = document.getElementById('statsBackdrop');
+const statsSheet = document.getElementById('statsSheet');
+let statsLiveInterval = null;
+function openStats(){
+  statsBackdrop.style.display = 'block'; statsSheet.style.display = 'flex';
+  renderStatsSheet();
+  clearInterval(statsLiveInterval);
+  statsLiveInterval = setInterval(() => { if (tripStats) renderStatsSheet(); }, 2000);
+}
+function closeStats(){ statsBackdrop.style.display = 'none'; statsSheet.style.display = 'none'; clearInterval(statsLiveInterval); }
+document.getElementById('statsBtn').addEventListener('click', openStats);
+document.getElementById('statsCloseBtn').addEventListener('click', closeStats);
+statsBackdrop.addEventListener('click', closeStats);
+
+function tripStatRowHTML(t, live){
+  const durationMs = live ? (Date.now() - t.startTime) : t.durationMs;
+  const distanceKm = live ? (t.distanceMeters/1000) : t.distanceKm;
+  const avgSpeed = live ? (t.speedCount ? t.speedSum/t.speedCount : 0) : t.avgSpeed;
+  const maxSpeed = t.maxSpeed;
+  const lvl1 = t.lvl1Events, lvl2 = t.lvl2Events;
+  const overMin = (live ? t.timeOverLimitMs : t.timeOverLimitMs)/60000;
+  const underMin = (live ? t.timeUnderPaceMs : t.timeUnderPaceMs)/60000;
+  const harshA = t.harshAccelCount, harshB = t.harshBrakeCount;
+  const cost = live ? estimateFuelCost(distanceKm) : t.fuelCost;
+  const costUnit = vehicleType === 'electric' ? 'kWh' : 'L';
+
+  return `
+    <div class="trip-stat-grid">
+      <div class="trip-stat"><div class="v">${distanceKm.toFixed(1)}</div><div class="l">km</div></div>
+      <div class="trip-stat"><div class="v">${formatDuration(durationMs)}</div><div class="l">Duración</div></div>
+      <div class="trip-stat"><div class="v">${Math.round(avgSpeed)}</div><div class="l">Media km/h</div></div>
+      <div class="trip-stat ${maxSpeed > 140 ? 'danger' : ''}"><div class="v">${Math.round(maxSpeed)}</div><div class="l">Máxima km/h</div></div>
+      <div class="trip-stat ${lvl2>0?'danger':(lvl1>0?'warn':'good')}"><div class="v">${lvl1}/${lvl2}</div><div class="l">Excesos N1/N2</div></div>
+      <div class="trip-stat ${harshA+harshB>0?'warn':'good'}"><div class="v">${harshA}/${harshB}</div><div class="l">Acelerón/Frenazo</div></div>
+      <div class="trip-stat ${overMin>2?'warn':'good'}"><div class="v">${overMin.toFixed(1)}</div><div class="l">Min. en exceso</div></div>
+      <div class="trip-stat"><div class="v">${underMin.toFixed(1)}</div><div class="l">Min. muy lento</div></div>
+    </div>
+    <div class="trip-cost-row"><span>⛽ Coste estimado (${(distanceKm*(vehicleConsumption/100)).toFixed(1)} ${costUnit})</span><b>${cost.toFixed(2)} €</b></div>
+  `;
+}
+
+function renderStatsSheet(){
+  const liveSection = document.getElementById('liveTripSection');
+  const liveCard = document.getElementById('liveTripCard');
+  if (tripStats){
+    liveSection.style.display = 'block';
+    liveCard.innerHTML = `<div class="trip-card">
+      <div class="trip-card-head"><div class="trip-card-title">🚗 ${tripStats.destinationName}</div><span class="trip-badge partial">En curso</span></div>
+      ${tripStatRowHTML(tripStats, true)}
+    </div>`;
+  } else {
+    liveSection.style.display = 'none';
+  }
+
+  const list = document.getElementById('tripHistoryList');
+  const empty = document.getElementById('tripHistoryEmpty');
+  if (!tripHistory.length){
+    list.innerHTML = ''; empty.style.display = 'block'; return;
+  }
+  empty.style.display = 'none';
+  list.innerHTML = tripHistory.map((t, i) => `
+    <div class="trip-card">
+      <div class="trip-card-head">
+        <div>
+          <div class="trip-card-title">${t.completed ? '🏁' : '⏹️'} ${t.destination}</div>
+          <div class="trip-card-date">${t.date.toLocaleDateString('es-ES')} · ${t.date.toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'})}</div>
+        </div>
+        <span class="trip-badge ${t.completed ? 'completed' : 'partial'}">${t.completed ? 'Completado' : 'Parcial'}</span>
+      </div>
+      ${tripStatRowHTML(t, false)}
+    </div>
+  `).join('');
+}
+renderStatsSheet();
 
 /* ============================================================
    UTILIDADES
