@@ -1,0 +1,33 @@
+# Guardar como: .github/workflows/update_gasolineras.yml en tu repo
+# Actualiza gasolineras.json cada 3 horas y hace commit si hay cambios.
+# El Ministerio dice actualizar cada 5 min, pero en la práctica va a rachas;
+# cada 3h es un buen equilibrio entre frescura y no saturar tu repo de commits.
+
+name: Actualizar precios de gasolineras
+
+on:
+  schedule:
+    - cron: '0 */3 * * *'   # cada 3 horas
+  workflow_dispatch: {}       # botón manual "Run workflow" en GitHub
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - run: pip install requests
+
+      - run: python download_gasolineras.py
+
+      - name: Commit si hay cambios
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add gasolineras.json
+          git diff --cached --quiet || git commit -m "Actualizar precios de gasolineras $(date -u +%Y-%m-%dT%H:%M)"
+          git push
