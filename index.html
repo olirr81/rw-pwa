@@ -29,6 +29,7 @@
   --radius-lg:22px;
   --radius-md:14px;
   --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-top: calc(env(safe-area-inset-top, 0px) + 46px);
 }
 body.theme-day{
   --bg:#e9edf2;
@@ -59,7 +60,7 @@ body{
 
 /* ---------- TOP HUD ---------- */
 .hud-top{
-  position:absolute; top:calc(12px + env(safe-area-inset-top,0px)); left:12px; right:12px; z-index:15;
+  position:absolute; top:var(--safe-top); left:12px; right:12px; z-index:15;
   display:flex; flex-direction:column; gap:8px; pointer-events:none;
 }
 .hud-row{ display:flex; gap:8px; align-items:stretch; pointer-events:auto; }
@@ -98,8 +99,7 @@ body{
 
 /* ---------- MANEUVER BANNER ---------- */
 .maneuver-banner{
-  position:absolute; top:calc(12px + env(safe-area-inset-top,0px)); left:12px; right:12px; z-index:16;
-  display:none; align-items:center; gap:14px; padding:14px 16px; border-radius:20px;
+  display:none; align-items:center; gap:14px; padding:14px 16px; border-radius:20px; pointer-events:auto;
   background: var(--sheet-bg); border:1px solid rgba(0,229,255,0.3); box-shadow:0 14px 40px rgba(0,0,0,0.4);
 }
 .maneuver-icon{ font-size:2.1rem; line-height:1; filter: drop-shadow(0 0 10px rgba(0,229,255,0.5)); flex-shrink:0; }
@@ -111,12 +111,12 @@ body{
 .maneuver-eta-mini .eta-label{ font-size:0.55rem; color:var(--text-muted); text-transform:uppercase; }
 
 .recalc-toast{
-  position:absolute; top:100px; left:50%; transform:translateX(-50%); z-index:17;
+  position:absolute; top:calc(var(--safe-top) + 210px); left:50%; transform:translateX(-50%); z-index:17;
   background:var(--warn); color:#1a1300; font-weight:700; font-size:0.8rem; padding:8px 16px;
   border-radius:20px; display:none; box-shadow:0 8px 24px rgba(0,0,0,0.5); align-items:center; gap:8px;
 }
 .copilot-toast{
-  position:absolute; top:100px; left:50%; transform:translateX(-50%); z-index:18;
+  position:absolute; top:calc(var(--safe-top) + 210px); left:50%; transform:translateX(-50%); z-index:18;
   background:var(--danger); color:#fff; font-weight:800; font-size:0.85rem; padding:10px 18px;
   border-radius:20px; display:none; box-shadow:0 8px 26px rgba(0,0,0,0.5); align-items:center; gap:8px;
 }
@@ -338,22 +338,21 @@ body.theme-day .segmented button.active{ color:#fff; }
 <div id="map-container">
   <div id="map"></div>
 
-  <div id="maneuverBanner" class="maneuver-banner">
-    <div class="maneuver-icon" id="maneuverIcon">⬆️</div>
-    <div class="maneuver-text">
-      <div class="maneuver-instruction" id="maneuverInstruction">Continúa recto</div>
-      <div class="maneuver-distance mono" id="maneuverDistance">-- m</div>
-    </div>
-    <div class="maneuver-eta-mini">
-      <div class="eta-time" id="etaTimeMini">--:--</div>
-      <div class="eta-label">Llegada</div>
-    </div>
-  </div>
-
   <div class="recalc-toast" id="recalcToast">⚠️ Recalculando ruta…</div>
   <div class="copilot-toast" id="copilotToast"></div>
 
   <div class="hud-top" id="hudTop">
+    <div id="maneuverBanner" class="maneuver-banner glass">
+      <div class="maneuver-icon" id="maneuverIcon">⬆️</div>
+      <div class="maneuver-text">
+        <div class="maneuver-instruction" id="maneuverInstruction">Continúa recto</div>
+        <div class="maneuver-distance mono" id="maneuverDistance">-- m</div>
+      </div>
+      <div class="maneuver-eta-mini">
+        <div class="eta-time" id="etaTimeMini">--:--</div>
+        <div class="eta-label">Llegada</div>
+      </div>
+    </div>
     <div class="hud-row">
       <div class="speed-dial-wrap" id="speedDialWrap">
         <div class="speed-dial-inner">
@@ -567,6 +566,7 @@ let routesData = [];
 let selectedRouteIdx = 0;
 let routeCoords = [];
 let routeSteps = [];
+let routeAnnotationSpeeds = []; // m/s por segmento, de OSRM annotations=true (aproximación de la velocidad de la vía)
 let stepBoundaries = [];
 let totalRouteDistance = 0;
 let totalRouteDuration = 0;
@@ -823,14 +823,34 @@ async function loadRadaresData(){
   }
 }
 
+/* El feed real (OSM speed_camera) anida los datos útiles en tags.* en vez de en la raíz.
+   Esta función normaliza cualquiera de los dos formatos para que el resto de la app
+   no tenga que preocuparse de dónde vive cada campo. */
+function normalizeRadar(r){
+  const tags = r.tags || {};
+  const rawSpeed = r.velocidad ?? tags.maxspeed ?? null;
+  const velocidad = rawSpeed ? parseInt(String(rawSpeed).replace(/[^\d]/g,''), 10) : null;
+  const highway = r.tipo || tags.highway || null;
+  const tipo = highway === 'speed_camera' ? 'RADAR_FIJO' : (highway || 'RADAR');
+  const direction = r.direction ?? tags.direction ?? null;
+  const note = r.note ?? tags.note ?? null;
+  return {
+    lat: parseFloat(r.lat), lon: parseFloat(r.lon),
+    velocidad: velocidad || null, tipo, direction: direction != null ? parseFloat(direction) : null, note
+  };
+}
+
 function radaresToGeoJSON(list){
   return {
     type: 'FeatureCollection',
-    features: list.map((r, index) => ({
-      type: 'Feature',
-      geometry: { type: 'Point', coordinates: [parseFloat(r.lon), parseFloat(r.lat)] },
-      properties: { idx: index, tipo: r.tipo || 'RADAR_FIJO', vel: r.velocidad || 80 }
-    }))
+    features: list.map((r, index) => {
+      const n = normalizeRadar(r);
+      return {
+        type: 'Feature',
+        geometry: { type: 'Point', coordinates: [n.lon, n.lat] },
+        properties: { idx: index, tipo: n.tipo, vel: n.velocidad || '?' }
+      };
+    })
   };
 }
 
@@ -914,15 +934,28 @@ function setupRadaresClusterLayer(){
 function prettyKey(k){
   return k.replace(/_/g,' ').replace(/\b\w/g, c => c.toUpperCase());
 }
+/* Aplana objetos anidados (p.ej. "tags": {...}) en filas planas para la ficha del popup */
+function flattenForPopup(obj, prefix=''){
+  let rows = [];
+  Object.entries(obj).forEach(([k,v]) => {
+    if (v !== null && typeof v === 'object' && !Array.isArray(v)){
+      rows = rows.concat(flattenForPopup(v, prefix));
+    } else if (k !== 'lat' && k !== 'lon' && k !== 'type'){
+      rows.push([prettyKey(k), v]);
+    }
+  });
+  return rows;
+}
 function showRadarPopup(e){
   const idx = e.features[0].properties.idx;
   const r = radares[idx];
   if (!r) return;
+  const n = normalizeRadar(r);
   const coords = e.features[0].geometry.coordinates.slice();
-  const dist = Math.round(getDistanceMeters(currentPos.lat, currentPos.lon, parseFloat(r.lat), parseFloat(r.lon)));
-  const rows = Object.entries(r).map(([k,v]) => `<tr><td>${prettyKey(k)}</td><td>${v}</td></tr>`).join('');
+  const dist = Math.round(getDistanceMeters(currentPos.lat, currentPos.lon, n.lat, n.lon));
+  const rows = flattenForPopup(r).map(([k,v]) => `<tr><td>${k}</td><td>${v}</td></tr>`).join('');
   const html = `<div class="radar-popup">
-      <div class="popup-title">📷 ${(r.tipo || 'RADAR').replace(/_/g,' ')}</div>
+      <div class="popup-title">📷 ${n.tipo.replace(/_/g,' ')}${n.velocidad ? ' · ' + n.velocidad + ' km/h' : ''}</div>
       <table>${rows}<tr><td>Distancia</td><td>${dist} m</td></tr></table>
     </div>`;
   new maplibregl.Popup({ closeButton: true, offset: 14 }).setLngLat(coords).setHTML(html).addTo(map);
@@ -932,8 +965,9 @@ function showRadarPopup(e){
 function setRouteHighlightRadares(indices){
   const feats = indices.map(i => {
     const r = radares[i];
-    return { type:'Feature', geometry:{ type:'Point', coordinates:[parseFloat(r.lon), parseFloat(r.lat)] },
-      properties:{ idx:i, tipo:r.tipo || 'RADAR_FIJO', vel:r.velocidad || 80 } };
+    const n = normalizeRadar(r);
+    return { type:'Feature', geometry:{ type:'Point', coordinates:[n.lon, n.lat] },
+      properties:{ idx:i, tipo:n.tipo, vel:n.velocidad || '?' } };
   });
   const data = { type:'FeatureCollection', features: feats };
 
@@ -1077,7 +1111,7 @@ async function selectDestination(place){
 
 async function fetchRoutes(){
   try{
-    const url = `https://router.project-osrm.org/route/v1/driving/${currentPos.lon},${currentPos.lat};${selectedDestination.lon},${selectedDestination.lat}?overview=full&geometries=geojson&steps=true&alternatives=true`;
+    const url = `https://router.project-osrm.org/route/v1/driving/${currentPos.lon},${currentPos.lat};${selectedDestination.lon},${selectedDestination.lat}?overview=full&geometries=geojson&steps=true&alternatives=true&annotations=speed`;
     const res = await fetch(url);
     const data = await res.json();
     if (data.routes && data.routes.length > 0){
@@ -1116,6 +1150,7 @@ function applySelectedRoute(){
   const route = routesData[selectedRouteIdx];
   routeCoords = route.geometry.coordinates;
   routeSteps = (route.legs && route.legs[0] && route.legs[0].steps) ? route.legs[0].steps : [];
+  routeAnnotationSpeeds = (route.legs && route.legs[0] && route.legs[0].annotation && route.legs[0].annotation.speed) ? route.legs[0].annotation.speed : [];
   totalRouteDistance = route.distance; totalRouteDuration = route.duration;
   stepBoundaries = buildStepBoundaries(routeSteps);
 
@@ -1225,7 +1260,7 @@ cancelPreviewBtn.addEventListener('click', () => {
   searchSheet.style.display = 'block';
   destInput.value = ''; searchClear.style.display = 'none';
   removeRouteLayers(); clearRouteHighlightRadares();
-  routeCoords = []; routesData = [];
+  routeCoords = []; routesData = []; routeAnnotationSpeeds = [];
   map.flyTo({ center: [currentPos.lon, currentPos.lat], zoom: 15 });
 });
 
@@ -1240,7 +1275,7 @@ function stopNavigation(msg){
   if (msg) speak(msg);
   if (watchId !== null) navigator.geolocation.clearWatch(watchId);
   removeRouteLayers(); clearRouteHighlightRadares();
-  routeCoords = []; routesData = [];
+  routeCoords = []; routesData = []; routeAnnotationSpeeds = [];
   map.easeTo({ pitch: 0, bearing: 0, duration: 700 });
 }
 
@@ -1279,9 +1314,10 @@ function updatePosition(lat, lon, speed, rawHeading){
   requestAnimationFrame(animStep);
 
   currentPos.speed = speed;
+  const routeIdx = progress ? progress.idx : null;
   checkProximity(lat, lon);
-  updateSpeedDial(speed);
-  checkCopilot(speed);
+  updateSpeedDial(speed, routeIdx);
+  checkCopilot(speed, routeIdx);
 
   if (isNavigating) updateNavProgress(lat, lon, progress);
 }
@@ -1321,8 +1357,8 @@ function buildMarkerHTML(){
 function updateMarkerAppearance(){ userMarker.getElement().innerHTML = buildMarkerHTML(); }
 
 /* ---------- gauge de velocidad ---------- */
-function updateSpeedDial(speed){
-  const limit = getEffectiveLimit();
+function updateSpeedDial(speed, routeIdx){
+  const limit = getEffectiveLimit(routeIdx).value;
   let color = '#00e676', pct = Math.min(100, (speed/160)*100);
   if (limit){
     const ratio = speed/limit;
@@ -1334,22 +1370,33 @@ function updateSpeedDial(speed){
 }
 
 /* ---------- proximidad a radares ---------- */
+/* Un radar que "mira" en dirección opuesta a la nuestra no nos afecta: lo descartamos
+   de las alertas (así evitamos avisos de radares del carril contrario, como hace Waze). */
+function isRadarRelevantForHeading(radarDirection, heading, speed){
+  if (radarDirection == null || speed < 8) return true; // sin dato de dirección, o parados: no filtramos
+  let diff = Math.abs(radarDirection - heading) % 360;
+  if (diff > 180) diff = 360 - diff;
+  return diff <= 100; // orientado a favor (±100°) => nos afecta
+}
+
 function checkProximity(lat, lon){
   if (!radares.length){ nearestRadarObj = null; nearestRadarDist = Infinity; return; }
-  let minDist = Infinity, closest = null;
+  let minDist = Infinity, closest = null, closestNorm = null;
   for (let i = 0; i < radares.length; i++){
-    const r = radares[i];
-    const d = getDistanceMeters(lat, lon, parseFloat(r.lat), parseFloat(r.lon));
-    if (d < minDist){ minDist = d; closest = r; }
+    const n = normalizeRadar(radares[i]);
+    if (!isRadarRelevantForHeading(n.direction, currentPos.heading, currentPos.speed)) continue;
+    const d = getDistanceMeters(lat, lon, n.lat, n.lon);
+    if (d < minDist){ minDist = d; closest = radares[i]; closestNorm = n; }
   }
   nearestRadarObj = closest; nearestRadarDist = minDist;
 
   if (closest && minDist < 1500){
-    const rName = (closest.tipo || 'RADAR').replace(/_/g,' ');
-    radarType.textContent = `${rName} (${closest.velocidad || 80} km/h)`;
+    const rName = closestNorm.tipo.replace(/_/g,' ');
+    const limitTxt = closestNorm.velocidad ? `${closestNorm.velocidad} km/h` : 'límite desconocido';
+    radarType.textContent = `${rName} (${limitTxt})`;
     radarDist.textContent = `${Math.round(minDist)} m`;
     radarHud.classList.remove('idle');
-    if (minDist <= 500 && lastAlerted500 !== closest){ lastAlerted500 = closest; pulseRadarHud(); speak(`Atención, radar a quinientos metros. Límite de ${closest.velocidad || 80} kilómetros por hora.`); }
+    if (minDist <= 500 && lastAlerted500 !== closest){ lastAlerted500 = closest; pulseRadarHud(); speak(`Atención, radar a quinientos metros. Límite de ${closestNorm.velocidad || 'velocidad'} kilómetros por hora.`); }
     if (minDist <= 150 && lastAlerted150 !== closest){ lastAlerted150 = closest; pulseRadarHud(); speak('Radar inmediato.'); }
   } else {
     radarType.textContent = 'Sin alertas'; radarDist.textContent = '-- m';
@@ -1361,16 +1408,27 @@ function pulseRadarHud(){ radarHud.classList.remove('pulse'); void radarHud.offs
 /* ============================================================
    COPILOTO INVISIBLE
    ============================================================ */
-function getEffectiveLimit(){
+/* Fuentes de límite, en orden de prioridad:
+   1) Radar cercano con velocidad conocida (si está activado y a <2km)
+   2) Velocidad de la vía estimada por OSRM a partir del tipo de carretera / maxspeed de OSM
+      (annotations=speed del tramo de ruta donde estás ahora mismo — sólo disponible navegando)
+   3) Límite genérico configurable, como último recurso */
+function getEffectiveLimit(routeIdx){
   if (copilotUseRadarLimit && nearestRadarObj && nearestRadarDist < 2000){
-    return nearestRadarObj.velocidad || copilotGenericLimit;
+    const v = normalizeRadar(nearestRadarObj).velocidad;
+    if (v) return { value: v, source: 'radar' };
   }
-  return copilotGenericLimit;
+  if (isNavigating && routeAnnotationSpeeds && routeAnnotationSpeeds.length && routeIdx != null){
+    const idx = Math.max(0, Math.min(routeIdx, routeAnnotationSpeeds.length - 1));
+    const spd = routeAnnotationSpeeds[idx];
+    if (spd && spd > 0) return { value: Math.round((spd*3.6)/5)*5, source: 'via' };
+  }
+  return { value: copilotGenericLimit, source: 'generico' };
 }
 
-function checkCopilot(speed){
+function checkCopilot(speed, routeIdx){
   if (!copilotEnabled || speed < 5){ overLvl1Since = null; overLvl1Fired = false; overLvl2Since = null; overLvl2Fired = false; return; }
-  const limit = getEffectiveLimit();
+  const limit = getEffectiveLimit(routeIdx).value;
   const overPct = ((speed/limit) - 1) * 100;
   const now = Date.now();
 
@@ -1489,7 +1547,7 @@ function updateNavProgress(lat, lon, precomputed){
 async function recalcRoute(){
   recalcToast.style.display = 'flex';
   try{
-    const url = `https://router.project-osrm.org/route/v1/driving/${currentPos.lon},${currentPos.lat};${selectedDestination.lon},${selectedDestination.lat}?overview=full&geometries=geojson&steps=true`;
+    const url = `https://router.project-osrm.org/route/v1/driving/${currentPos.lon},${currentPos.lat};${selectedDestination.lon},${selectedDestination.lat}?overview=full&geometries=geojson&steps=true&annotations=speed`;
     const res = await fetch(url);
     const data = await res.json();
     if (data.routes && data.routes[0]){
@@ -1594,7 +1652,7 @@ function updateCopilotPreview(){
   document.getElementById('copilotPreview').innerHTML =
     `<b>Nivel 1:</b> bip si superas el límite ${copilotLvl1Pct}% durante ${copilotLvl1Sec}s seguidos.<br>
      <b>Nivel 2:</b> voz "¡Alerta! Suelta el pie" si superas el límite ${copilotLvl2Pct}% durante ${copilotLvl2Sec}s seguidos.<br>
-     Límite de referencia: el del radar más cercano si hay uno a menos de 2 km${copilotUseRadarLimit ? '' : ' (desactivado)'}, si no, ${copilotGenericLimit} km/h.`;
+     <b>Límite de referencia (por prioridad):</b> 1) radar cercano (&lt;2km)${copilotUseRadarLimit ? '' : ' — desactivado'}; 2) velocidad estimada de la vía por OSRM mientras navegas; 3) genérico de ${copilotGenericLimit} km/h si no hay datos.`;
 }
 updateCopilotPreview();
 
