@@ -1292,28 +1292,70 @@ function nominatimToResult(place){
 }
 
 async function searchPhoton(query, strongBias){
-  const bias = strongBias ? '&location_bias_scale=0.9&zoom=15' : '&zoom=10';
-  const url = `https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&lat=${currentPos.lat}&lon=${currentPos.lon}&limit=10&lang=es${bias}`;
+  // BUG anterior: mandábamos lat/lon SIEMPRE, incluso con "Todo el mundo" activado.
+  // Photon usa esas coordenadas para ordenar Y para descartar candidatos de baja
+  // relevancia — con sesgo fuerte, un resultado a 600km (aunque sea el correcto)
+  // puede quedar fuera de los primeros puestos. Si worldwideSearch está activo, no
+  // mandamos sesgo de posición en absoluto: dejamos que Photon puntúe por
+  // relevancia textual pura, como un buscador global de verdad.
+  let bias = '';
+  if (worldwideSearch){
+    bias = ''; // sin lat/lon: búsqueda puramente global
+  } else if (strongBias){
+    bias = `&lat=${currentPos.lat}&lon=${currentPos.lon}&location_bias_scale=0.9&zoom=15`;
+  } else {
+    bias = `&lat=${currentPos.lat}&lon=${currentPos.lon}&zoom=8`; // antes zoom=10, algo menos agresivo
+  }
+  const url = `https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&limit=12&lang=es${bias}`;
   const res = await fetch(url);
   const data = await res.json();
   return (data.features || []).map(photonToResult);
 }
 async function searchNominatimFallback(query, strongBias){
-  let url = `https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&limit=8&q=${encodeURIComponent(query)}`;
-  if (!worldwideSearch && userCountryCode) url += `&countrycodes=${userCountryCode}`;
-  const d = strongBias ? 0.15 : 3.0;
-  url += `&viewbox=${currentPos.lon-d},${currentPos.lat+d},${currentPos.lon+d},${currentPos.lat-d}&bounded=${strongBias?1:0}`;
+  let url = `https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&limit=10&q=${encodeURIComponent(query)}`;
+  if (!worldwideSearch){
+    if (userCountryCode) url += `&countrycodes=${userCountryCode}`;
+    const d = strongBias ? 0.15 : 3.0;
+    url += `&viewbox=${currentPos.lon-d},${currentPos.lat+d},${currentPos.lon+d},${currentPos.lat-d}&bounded=${strongBias?1:0}`;
+  }
+  // en worldwide: sin countrycodes ni viewbox, búsqueda global sin sesgo
   const res = await fetch(url);
   const data = await res.json();
   return data.map(nominatimToResult);
 }
 
-async function runSearch(query, strongBias){
+/* Si la query completa no da nada (típico con nombres de negocio tipo "Appart hotel X" que
+   incluyen palabras genéricas), probamos variantes más cortas: quitamos palabras genéricas
+   (hotel/apartamento/restaurante/etc.) y nos quedamos con lo más probablemente distintivo
+   (el nombre propio). Esto rescata bastantes casos que si no darían 0 resultados. */
+const GENERIC_WORDS = new Set(['hotel','hostal','apartahotel','appart','apartamento','apartamentos','restaurante','restaurant','bar','cafe','café','tienda','farmacia','gasolinera','parking','garaje']);
+function buildQueryVariants(query){
+  const variants = [query];
+  const words = query.trim().split(/\s+/);
+  if (words.length > 2){
+    const stripped = words.filter(w => !GENERIC_WORDS.has(w.toLowerCase()));
+    if (stripped.length >= 1 && stripped.join(' ') !== query) variants.push(stripped.join(' '));
+    const lastTwo = words.slice(-2).join(' ');
+    if (lastTwo !== query) variants.push(lastTwo);
+  }
+  return [...new Set(variants)];
+}
+
+async function runSearchOnce(query, strongBias){
   let results = [];
   try{ results = await searchPhoton(query, strongBias); }
   catch(e){ console.warn('Photon falló, usando Nominatim:', e); }
   if (!results.length){
     try{ results = await searchNominatimFallback(query, strongBias); }catch(e){ console.error(e); }
+  }
+  return results;
+}
+
+async function runSearch(query, strongBias){
+  let results = [];
+  for (const variant of buildQueryVariants(query)){
+    results = await runSearchOnce(variant, strongBias);
+    if (results.length) break; // en cuanto una variante da resultados, paramos
   }
 
   results.forEach(r => { r.dist = getDistanceMeters(currentPos.lat, currentPos.lon, r.lat, r.lon); });
@@ -1321,18 +1363,36 @@ async function runSearch(query, strongBias){
 
   if (!worldwideSearch && userCountryCode){
     const filtered = results.filter(r => !r.countrycode || r.countrycode === userCountryCode);
-    // Si filtrar por país nos deja sin nada útil, mejor mostrar los resultados
-    // "de fuera" que dejar al usuario sin resultados (eso era justo la queja).
     if (filtered.length > 0) results = filtered;
   }
-  return results;
+
+  const deduped = [];
+  for (const r of results){
+    const dup = deduped.find(d => getDistanceMeters(d.lat, d.lon, r.lat, r.lon) < 25);
+    if (!dup) deduped.push(r);
+  }
+  return deduped;
 }
 
-async function doSearch(query){ renderSearchResults(await runSearch(query, false)); }
+let lastSearchQuery = '';
+async function doSearch(query){
+  lastSearchQuery = query;
+  renderSearchResults(await runSearch(query, false));
+}
 
 function renderSearchResults(data){
   searchResults.innerHTML = '';
-  if (!data.length){ searchResults.style.display = 'none'; searchEmpty.style.display = 'block'; return; }
+  if (!data.length){
+    searchResults.style.display = 'none';
+    searchEmpty.style.display = 'block';
+    searchEmpty.innerHTML = `Sin resultados en nuestro mapa (OpenStreetMap). Puede que el sitio exista pero no esté indexado ahí — pasa con negocios recientes, hoteles, restaurantes, etc.
+      <div style="margin-top:10px;">
+        <button class="quick-chip" id="googleMapsFallbackBtn" style="margin:0 auto;">🌐 Buscar "${lastSearchQuery}" en Google Maps</button>
+      </div>`;
+    const gbtn = document.getElementById('googleMapsFallbackBtn');
+    if (gbtn) gbtn.onclick = () => window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(lastSearchQuery)}`, '_blank');
+    return;
+  }
   searchEmpty.style.display = 'none';
   searchResults.style.display = 'flex';
   data.forEach(place => {
@@ -1354,6 +1414,7 @@ document.getElementById('chipWork').addEventListener('click', () => alert('Guard
 
 async function quickPoiSearch(term){
   destInput.value = term; searchClear.style.display = 'block';
+  lastSearchQuery = term;
   renderSearchResults(await runSearch(term, true));
 }
 
