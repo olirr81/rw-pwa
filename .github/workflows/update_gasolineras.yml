@@ -22,7 +22,7 @@ jobs:
 
       - run: pip install requests
 
-      - run: python download_gasolineras.py
+      - run: python scripts/download_gasolineras.py
 
       - name: Commit si hay cambios
         run: |
