@@ -1,0 +1,4 @@
+{
+  "paises_activos": ["ES", "AND", "FR", "DE", "IT", "CH", "AT"],
+  "nota": "De estos, hoy solo ES, FR e IT tienen fuente pública de descarga masiva gratuita. AND/DE/CH/AT se listan igualmente y quedan documentados en la salida como no disponibles, para no perder el requisito."
+}
