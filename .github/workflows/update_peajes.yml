@@ -1,0 +1,32 @@
+# Guardar como: .github/workflows/update_peajes.yml en tu repo
+# Las ubicaciones de peajes apenas cambian, así que basta con una vez por semana
+# (a diferencia de los precios de gasolina, que sí varían a diario).
+
+name: Actualizar ubicaciones de peajes
+
+on:
+  schedule:
+    - cron: '0 4 * * 1'   # todos los lunes a las 04:00 UTC
+  workflow_dispatch: {}
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - run: pip install requests
+
+      - run: python download_peajes.py
+
+      - name: Commit si hay cambios
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add peajes.json cache_peajes_ES.json cache_peajes_FR.json cache_peajes_IT.json
+          git diff --cached --quiet || git commit -m "Actualizar ubicaciones de peajes $(date -u +%Y-%m-%dT%H:%M)"
+          git push
