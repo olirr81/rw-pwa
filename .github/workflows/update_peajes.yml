@@ -21,7 +21,7 @@ jobs:
 
       - run: pip install requests
 
-      - run: python download_peajes.py
+      - run: python scripts/download_peajes.py
 
       - name: Commit si hay cambios
         run: |
