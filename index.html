@@ -212,6 +212,7 @@ body{
   border-top-left-radius:26px; border-top-right-radius:26px;
   padding:22px 18px calc(30px + var(--safe-bottom)) 18px; border-top:1px solid rgba(0,229,255,0.3);
   box-shadow:0 -12px 44px rgba(0,0,0,0.55); display:none; flex-direction:column; gap:12px;
+  max-height:82vh; overflow-y:auto; -webkit-overflow-scrolling:touch;
 }
 .route-info-row{ display:flex; justify-content:space-between; align-items:flex-start; gap:10px; }
 .route-title{ font-size:1.12rem; font-weight:700; max-width:60%; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
@@ -234,6 +235,34 @@ body{
 }
 .route-radares-tag.clean{ background:rgba(0,230,118,0.1); border-color:rgba(0,230,118,0.35); color:var(--success); }
 
+/* ---------- SELECTOR DE VEHÍCULO / COMBUSTIBLE (en el preview de ruta) ---------- */
+.fuel-picker-block{ display:flex; flex-direction:column; gap:8px; padding:14px; border-radius:18px;
+  background:linear-gradient(135deg, rgba(124,92,255,0.10), rgba(0,229,255,0.06)); border:1px solid rgba(124,92,255,0.28); }
+.fuel-picker-title{ font-size:0.68rem; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.06em; font-weight:700; display:flex; align-items:center; gap:6px; }
+.fuel-picker-row{ display:flex; gap:8px; overflow-x:auto; padding-bottom:2px; }
+.fuel-pick{ flex-shrink:0; display:flex; flex-direction:column; align-items:center; gap:3px; padding:10px 12px; border-radius:15px;
+  background:var(--surface-2); border:1.5px solid var(--border); cursor:pointer; min-width:62px; transition:all 0.15s ease; }
+.fuel-pick .fp-icon{ font-size:1.25rem; line-height:1; }
+.fuel-pick .fp-label{ font-size:0.6rem; color:var(--text-muted); text-align:center; white-space:nowrap; font-weight:600; }
+.fuel-pick.selected{ border-color:var(--accent-2); background:rgba(124,92,255,0.18); transform:translateY(-2px); }
+.fuel-pick.selected .fp-label{ color:var(--accent-2); }
+
+.fuel-cost-card{ display:flex; align-items:center; justify-content:space-between; padding:13px 15px; border-radius:16px;
+  background:linear-gradient(135deg, rgba(0,229,255,0.16), rgba(124,92,255,0.12)); border:1px solid rgba(0,229,255,0.3); }
+.fuel-cost-card .fc-label{ font-size:0.66rem; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.05em; font-weight:700; }
+.fuel-cost-card .fc-value{ font-family:'JetBrains Mono'; font-size:1.55rem; font-weight:800; color:var(--accent); margin-top:2px; line-height:1; }
+.fuel-cost-card .fc-sub{ font-size:0.65rem; color:var(--text-muted); margin-top:4px; }
+.fuel-cost-card .fc-icon{ font-size:1.8rem; flex-shrink:0; margin-left:10px; }
+
+.cheapest-station-card{ display:flex; align-items:center; gap:10px; padding:12px 14px; border-radius:15px;
+  background:rgba(0,230,118,0.10); border:1px solid rgba(0,230,118,0.32); cursor:pointer; }
+.cheapest-station-card:active{ background:rgba(0,230,118,0.18); }
+.cheapest-station-card .cs-badge{ font-size:1.35rem; flex-shrink:0; }
+.cheapest-station-card .cs-text{ flex:1; min-width:0; }
+.cheapest-station-card .cs-name{ font-size:0.85rem; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.cheapest-station-card .cs-detail{ font-size:0.68rem; color:var(--text-muted); margin-top:1px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.cheapest-station-card .cs-price{ font-family:'JetBrains Mono'; font-weight:800; color:var(--success); font-size:1.05rem; flex-shrink:0; }
+
 .route-buttons{ display:flex; gap:12px; margin-top:2px; }
 .btn-cancel-route{ flex:1; background:var(--surface-2); color:var(--text); padding:15px; border-radius:15px; border:1px solid var(--border); font-weight:700; cursor:pointer; font-family:'Space Grotesk'; font-size:0.95rem; }
 .btn-go-route{
@@ -241,6 +270,10 @@ body{
   font-weight:800; font-size:1.02rem; cursor:pointer; box-shadow:0 6px 22px rgba(0,200,83,0.45); font-family:'Space Grotesk';
   display:flex; align-items:center; justify-content:center; gap:8px;
 }
+
+.poi-subtitle{ font-size:0.66rem; color:var(--text-muted); margin:8px 0 2px 0; font-weight:600; }
+.result-price-badge{ font-family:'JetBrains Mono'; font-size:0.72rem; font-weight:800; color:var(--success);
+  background:rgba(0,230,118,0.14); padding:3px 9px; border-radius:10px; flex-shrink:0; white-space:nowrap; }
 
 /* ---------- ACTIVE NAV BOTTOM ---------- */
 .active-nav-sheet{
@@ -455,6 +488,30 @@ body.theme-day .segmented button.active{ color:#fff; }
       </div>
     </div>
     <div class="route-variants" id="routeVariants" style="display:none;"></div>
+
+    <div class="fuel-picker-block">
+      <div class="fuel-picker-title">🚘 <span>¿Qué coche llevas hoy?</span></div>
+      <div class="fuel-picker-row" id="fuelPickerRow"></div>
+    </div>
+
+    <div class="fuel-cost-card" id="fuelCostCard" style="display:none;">
+      <div>
+        <div class="fc-label" id="fuelCostLabel">Coste estimado del trayecto</div>
+        <div class="fc-value" id="fuelCostValue">-- €</div>
+        <div class="fc-sub" id="fuelCostSub"></div>
+      </div>
+      <div class="fc-icon" id="fuelCostIcon">⛽</div>
+    </div>
+
+    <div class="cheapest-station-card" id="cheapestStationCard" style="display:none;">
+      <div class="cs-badge">🏆</div>
+      <div class="cs-text">
+        <div class="cs-name" id="cheapestStationName">--</div>
+        <div class="cs-detail" id="cheapestStationDetail">--</div>
+      </div>
+      <div class="cs-price" id="cheapestStationPrice">--</div>
+    </div>
+
     <div class="route-radares-tag" id="routeRadaresTag">
       <span>📷</span> <span id="routeRadaresCount">Calculando radares…</span>
     </div>
@@ -528,8 +585,22 @@ body.theme-day .segmented button.active{ color:#fff; }
     <div class="divider"></div>
 
     <div class="settings-section">
-      <div class="settings-section-title">🎯 Tipos de radar visibles</div>
+      <div class="settings-section-title">🎯 POIs en el mapa</div>
+      <div class="poi-subtitle">📷 Radares</div>
       <div id="radarTypeToggles"></div>
+
+      <div class="poi-subtitle">⛽ Gasolineras</div>
+      <div class="toggle-row">
+        <div>
+          <div class="label">Mostrar gasolineras</div>
+          <div class="sub">Precios reales — cobertura actual: España, Francia, Italia</div>
+        </div>
+        <div class="switch on" id="gasolinerasVisibleSwitch"></div>
+      </div>
+      <div class="field-row">
+        <div class="field-label">Precio que se muestra en el icono del mapa</div>
+        <div class="style-row" id="mapLabelFuelRow"></div>
+      </div>
     </div>
 
     <div class="divider"></div>
@@ -588,18 +659,16 @@ body.theme-day .segmented button.active{ color:#fff; }
           <option value="">Personalizado (ajustar manualmente)</option>
         </select>
       </div>
-      <div class="segmented" id="vehicleTypeSegmented">
-        <button data-val="combustion" class="active">⛽ Combustión</button>
-        <button data-val="electric">🔌 Eléctrico</button>
-      </div>
+      <div class="style-row" id="vehicleFuelTypeRow"></div>
       <div class="field-row">
         <div class="field-label">Consumo medio <b id="vehicleConsumptionVal">6.5 L/100km</b></div>
         <input type="range" id="vehicleConsumptionInput" min="2" max="20" step="0.5" value="6.5">
       </div>
       <div class="field-row">
-        <div class="field-label">Precio <b id="vehiclePriceVal">1.65 €/L</b></div>
+        <div class="field-label">Precio manual (si no hay gasolineras cerca de tu ruta) <b id="vehiclePriceVal">1.65 €/L</b></div>
         <input type="range" id="vehiclePriceInput" min="0.05" max="2.50" step="0.05" value="1.65">
       </div>
+      <div class="copilot-preview" id="vehicleFuelNote" style="display:none;"></div>
     </div>
 
     <div class="divider"></div>
@@ -655,40 +724,88 @@ const CAR_EMOJI = { car:'🚗', suv:'🚙', police:'🚓', race:'🏎️' };
    pagar acceso a un proveedor tipo DGT/CO2 EEA y un backend) — esto es la alternativa 100%
    client-side: eliges tu coche de la lista y te precarga un consumo realista, editable después. */
 const CAR_PRESETS = [
-  { brand:'SEAT', model:'Ibiza 1.0 TSI', type:'combustion', consumption:5.4 },
-  { brand:'SEAT', model:'León 1.5 TSI', type:'combustion', consumption:5.9 },
-  { brand:'SEAT', model:'Arona', type:'combustion', consumption:5.6 },
-  { brand:'Volkswagen', model:'Polo 1.0 TSI', type:'combustion', consumption:5.2 },
-  { brand:'Volkswagen', model:'Golf 1.5 TSI', type:'combustion', consumption:5.8 },
-  { brand:'Volkswagen', model:'ID.3', type:'electric', consumption:15.4 },
-  { brand:'Renault', model:'Clio TCe', type:'combustion', consumption:5.3 },
-  { brand:'Renault', model:'Mégane', type:'combustion', consumption:6.0 },
-  { brand:'Renault', model:'Captur', type:'combustion', consumption:5.7 },
-  { brand:'Peugeot', model:'208', type:'combustion', consumption:5.2 },
-  { brand:'Peugeot', model:'308', type:'combustion', consumption:5.6 },
-  { brand:'Peugeot', model:'2008', type:'combustion', consumption:5.8 },
-  { brand:'Opel', model:'Corsa', type:'combustion', consumption:5.3 },
-  { brand:'Opel', model:'Astra', type:'combustion', consumption:5.7 },
-  { brand:'Citroën', model:'C3', type:'combustion', consumption:5.4 },
-  { brand:'Dacia', model:'Sandero', type:'combustion', consumption:5.6 },
-  { brand:'Dacia', model:'Duster', type:'combustion', consumption:6.4 },
-  { brand:'Toyota', model:'Corolla Hybrid', type:'combustion', consumption:4.3 },
-  { brand:'Toyota', model:'Yaris Hybrid', type:'combustion', consumption:3.8 },
-  { brand:'Toyota', model:'C-HR Hybrid', type:'combustion', consumption:4.6 },
-  { brand:'Hyundai', model:'i20', type:'combustion', consumption:5.2 },
-  { brand:'Hyundai', model:'Tucson', type:'combustion', consumption:6.5 },
-  { brand:'Kia', model:'Ceed', type:'combustion', consumption:5.7 },
-  { brand:'Kia', model:'Sportage', type:'combustion', consumption:6.3 },
-  { brand:'Nissan', model:'Qashqai', type:'combustion', consumption:6.1 },
-  { brand:'Ford', model:'Fiesta', type:'combustion', consumption:5.3 },
-  { brand:'Ford', model:'Focus', type:'combustion', consumption:5.8 },
-  { brand:'BMW', model:'Serie 1', type:'combustion', consumption:6.0 },
-  { brand:'BMW', model:'Serie 3', type:'combustion', consumption:6.4 },
-  { brand:'Audi', model:'A3', type:'combustion', consumption:5.9 },
-  { brand:'Mercedes', model:'Clase A', type:'combustion', consumption:6.1 },
-  { brand:'Tesla', model:'Model 3', type:'electric', consumption:14.9 },
-  { brand:'Tesla', model:'Model Y', type:'electric', consumption:16.9 },
-  { brand:'MG', model:'MG4 Electric', type:'electric', consumption:16.0 }
+  { brand:'SEAT', model:'Ibiza 1.0 TSI', type:'gasolina', consumption:5.4 },
+  { brand:'SEAT', model:'León 1.5 TSI', type:'gasolina', consumption:5.9 },
+  { brand:'SEAT', model:'León 2.0 TDI', type:'diesel', consumption:4.8 },
+  { brand:'SEAT', model:'Arona', type:'gasolina', consumption:5.6 },
+  { brand:'Volkswagen', model:'Polo 1.0 TSI', type:'gasolina', consumption:5.2 },
+  { brand:'Volkswagen', model:'Golf 1.5 TSI', type:'gasolina', consumption:5.8 },
+  { brand:'Volkswagen', model:'Golf 2.0 TDI', type:'diesel', consumption:4.9 },
+  { brand:'Volkswagen', model:'ID.3', type:'electrico', consumption:15.4 },
+  { brand:'Renault', model:'Clio TCe', type:'gasolina', consumption:5.3 },
+  { brand:'Renault', model:'Mégane E-Tech', type:'electrico', consumption:16.0 },
+  { brand:'Renault', model:'Captur E-Tech PHEV', type:'phev', consumption:1.5 },
+  { brand:'Peugeot', model:'208', type:'gasolina', consumption:5.2 },
+  { brand:'Peugeot', model:'308', type:'gasolina', consumption:5.6 },
+  { brand:'Peugeot', model:'3008 Hybrid4 PHEV', type:'phev', consumption:1.8 },
+  { brand:'Opel', model:'Corsa', type:'gasolina', consumption:5.3 },
+  { brand:'Opel', model:'Astra 1.5 Diesel', type:'diesel', consumption:4.7 },
+  { brand:'Citroën', model:'C3', type:'gasolina', consumption:5.4 },
+  { brand:'Dacia', model:'Sandero', type:'gasolina', consumption:5.6 },
+  { brand:'Dacia', model:'Duster dCi', type:'diesel', consumption:5.2 },
+  { brand:'Toyota', model:'Corolla Hybrid', type:'hibrido', consumption:4.3 },
+  { brand:'Toyota', model:'Yaris Hybrid', type:'hibrido', consumption:3.8 },
+  { brand:'Toyota', model:'C-HR Hybrid', type:'hibrido', consumption:4.6 },
+  { brand:'Toyota', model:'RAV4 Plug-in', type:'phev', consumption:1.0 },
+  { brand:'Hyundai', model:'i20', type:'gasolina', consumption:5.2 },
+  { brand:'Hyundai', model:'Tucson Diesel', type:'diesel', consumption:5.6 },
+  { brand:'Hyundai', model:'Ioniq 5', type:'electrico', consumption:17.0 },
+  { brand:'Kia', model:'Ceed', type:'gasolina', consumption:5.7 },
+  { brand:'Kia', model:'Sportage Hybrid', type:'hibrido', consumption:5.2 },
+  { brand:'Kia', model:'Niro PHEV', type:'phev', consumption:1.3 },
+  { brand:'Nissan', model:'Qashqai', type:'gasolina', consumption:6.1 },
+  { brand:'Ford', model:'Fiesta', type:'gasolina', consumption:5.3 },
+  { brand:'Ford', model:'Focus Diesel', type:'diesel', consumption:4.9 },
+  { brand:'BMW', model:'Serie 1', type:'gasolina', consumption:6.0 },
+  { brand:'BMW', model:'320d', type:'diesel', consumption:5.3 },
+  { brand:'BMW', model:'X5 xDrive45e PHEV', type:'phev', consumption:2.1 },
+  { brand:'Audi', model:'A3', type:'gasolina', consumption:5.9 },
+  { brand:'Audi', model:'A3 TDI', type:'diesel', consumption:4.6 },
+  { brand:'Mercedes', model:'Clase A', type:'gasolina', consumption:6.1 },
+  { brand:'Mercedes', model:'Clase C 220d', type:'diesel', consumption:5.0 },
+  { brand:'Skoda', model:'Octavia TDI', type:'diesel', consumption:4.7 },
+  { brand:'Volvo', model:'XC60 Recharge PHEV', type:'phev', consumption:2.0 },
+  { brand:'Tesla', model:'Model 3', type:'electrico', consumption:14.9 },
+  { brand:'Tesla', model:'Model Y', type:'electrico', consumption:16.9 },
+  { brand:'MG', model:'MG4 Electric', type:'electrico', consumption:16.0 }
+];
+
+/* Config central de los 5 tipos de combustible. priceField/priceFieldAlt apuntan a las
+   claves reales que trae gasolineras.json (gasolina95, diesel, dieselPlus...). Híbrido y
+   PHEV usan gasolina95 como referencia (son los que realmente repostan en surtidor);
+   PHEV lleva un consumo medio mucho más bajo por defecto porque una parte de sus km los
+   hace en modo eléctrico. Eléctrico no tiene priceField: no busca gasolineras, usa el
+   precio manual de tu tarifa de carga. */
+const FUEL_TYPES = {
+  gasolina: { label:'Gasolina', icon:'⛽', priceField:'gasolina95', priceFieldAlt:'gasolina98',
+    defaultConsumption:6.5, consMin:2, consMax:20, consStep:0.5, unit:'L/100km',
+    priceUnit:'€/L', priceMin:0.5, priceMax:2.5, priceStep:0.01, defaultPrice:1.65 },
+  diesel: { label:'Diésel', icon:'🛢️', priceField:'diesel', priceFieldAlt:'dieselPlus',
+    defaultConsumption:5.2, consMin:2, consMax:18, consStep:0.5, unit:'L/100km',
+    priceUnit:'€/L', priceMin:0.5, priceMax:2.5, priceStep:0.01, defaultPrice:1.75 },
+  hibrido: { label:'Híbrido', icon:'🔋', priceField:'gasolina95', priceFieldAlt:'gasolina98',
+    defaultConsumption:4.3, consMin:1, consMax:15, consStep:0.2, unit:'L/100km',
+    priceUnit:'€/L', priceMin:0.5, priceMax:2.5, priceStep:0.01, defaultPrice:1.65 },
+  phev: { label:'Híbrido enchufable', icon:'🔌', priceField:'gasolina95', priceFieldAlt:'gasolina98',
+    defaultConsumption:1.8, consMin:0.3, consMax:8, consStep:0.1, unit:'L/100km*',
+    priceUnit:'€/L', priceMin:0.5, priceMax:2.5, priceStep:0.01, defaultPrice:1.65,
+    note:'* Consumo medio combinando tramos en modo eléctrico y en gasolina. Ajústalo según cuánto sueles cargar la batería antes de salir.' },
+  electrico: { label:'Eléctrico', icon:'⚡', priceField:null, priceFieldAlt:null,
+    defaultConsumption:17, consMin:8, consMax:35, consStep:0.5, unit:'kWh/100km',
+    priceUnit:'€/kWh', priceMin:0.05, priceMax:0.60, priceStep:0.01, defaultPrice:0.15,
+    note:'Los vehículos eléctricos no buscan gasolineras. El coste se calcula con tu precio de carga manual (ajústalo en Ajustes según tu tarifa de casa/carga rápida).' }
+};
+const FUEL_TYPE_ORDER = ['gasolina','diesel','hibrido','phev','electrico'];
+
+/* Combustibles que se pueden elegir para el precio mostrado en el icono del mapa
+   (independiente del vehículo: un pasajero puede querer ver precios de diésel aunque
+   su coche sea de gasolina). GLP y GNC se incluyen porque el feed de España los trae. */
+const MAP_LABEL_FUELS = [
+  { key:'gasolina95', label:'Gasolina 95', icon:'⛽' },
+  { key:'diesel', label:'Diésel', icon:'🛢️' },
+  { key:'dieselPlus', label:'Diésel+', icon:'🛢️+' },
+  { key:'glp', label:'GLP', icon:'🔥' },
+  { key:'gnc', label:'GNC', icon:'💨' }
 ];
 
 let map;
@@ -755,9 +872,15 @@ let lastStatsTickTime = null;
 let lastStatsTickPos = null;
 
 /* ---- vehículo / coste estimado ---- */
-let vehicleType = 'combustion'; // combustion | electric
-let vehicleConsumption = 6.5;   // L/100km ó kWh/100km según vehicleType
-let vehiclePrice = 1.65;        // €/L ó €/kWh según vehicleType
+let vehicleFuelType = 'gasolina'; // gasolina | diesel | hibrido | phev | electrico
+let vehicleConsumption = FUEL_TYPES.gasolina.defaultConsumption;
+let vehiclePrice = FUEL_TYPES.gasolina.defaultPrice; // precio manual de respaldo si no hay gasolineras en la ruta
+
+/* ---- gasolineras ---- */
+let gasolineras = [];
+let gasolinerasVisible = true;
+let mapLabelFuel = 'gasolina95'; // qué precio se muestra en el icono del mapa (independiente del coche)
+let routeGasolinerasStats = null; // { matched:[], cheapest, avgPrice } de la ruta activa, para el fuel type actual
 
 /* ---------- DOM refs ---------- */
 const destInput = document.getElementById('destInput');
@@ -781,6 +904,16 @@ const previewEta = document.getElementById('previewEta');
 const routeVariants = document.getElementById('routeVariants');
 const routeRadaresCount = document.getElementById('routeRadaresCount');
 const routeRadaresTag = document.getElementById('routeRadaresTag');
+const fuelPickerRow = document.getElementById('fuelPickerRow');
+const fuelCostCard = document.getElementById('fuelCostCard');
+const fuelCostLabel = document.getElementById('fuelCostLabel');
+const fuelCostValue = document.getElementById('fuelCostValue');
+const fuelCostSub = document.getElementById('fuelCostSub');
+const fuelCostIcon = document.getElementById('fuelCostIcon');
+const cheapestStationCard = document.getElementById('cheapestStationCard');
+const cheapestStationName = document.getElementById('cheapestStationName');
+const cheapestStationDetail = document.getElementById('cheapestStationDetail');
+const cheapestStationPrice = document.getElementById('cheapestStationPrice');
 const goRouteBtn = document.getElementById('goRouteBtn');
 const cancelPreviewBtn = document.getElementById('cancelPreviewBtn');
 const stopNavBtn = document.getElementById('stopNavBtn');
@@ -946,8 +1079,9 @@ function initMap(){
 
   map.on('load', async () => {
     styleReady = true;
-    await loadRadaresData();
+    await Promise.all([loadRadaresData(), loadGasolinerasData()]);
     setupRadaresClusterLayer();
+    setupGasolinerasClusterLayer();
     initRealGPS();
   });
 }
@@ -990,14 +1124,18 @@ function forceRebuildAllLayers(){
   try{
     ['route-radares-label','route-radares-icon','route-radares-badge',
      'radares-label','radares-icon','radares-badge','cluster-count','cluster-icon','clusters',
+     'route-gasolineras-label','route-gasolineras-icon','route-gasolineras-badge',
+     'gasolineras-label','gasolineras-icon','gasolineras-badge','gas-cluster-count','gas-cluster-icon','gas-clusters',
      'route-layer','route-glow','route-alt-layer'].forEach(l => { if (map.getLayer(l)) map.removeLayer(l); });
-    ['route-radares-src','radares-src','route-src','route-alt-src'].forEach(s => { if (map.getSource(s)) map.removeSource(s); });
+    ['route-radares-src','radares-src','route-gasolineras-src','gasolineras-src','route-src','route-alt-src'].forEach(s => { if (map.getSource(s)) map.removeSource(s); });
   }catch(e){ console.warn('Limpieza de capas incompleta:', e); }
 
   if (radares.length) setupRadaresClusterLayer();
+  if (gasolineras.length) setupGasolinerasClusterLayer();
   if (routeCoords.length && routesData.length){
     drawRoutes();
     markRadaresOnRoute(routeCoords);
+    markGasolinerasOnRoute(routeCoords);
   }
 }
 
@@ -1229,6 +1367,306 @@ function clearRouteHighlightRadares(){
 }
 
 /* ============================================================
+   GASOLINERAS: precios reales (ES/FR/IT), capa con color por precio,
+   detección en ruta y estimación de coste del trayecto
+   ============================================================ */
+async function loadGasolinerasData(){
+  try{
+    const res = await fetch('gasolineras.json?v=' + Date.now());
+    const data = await res.json();
+    gasolineras = data.estaciones || [];
+    console.log('Gasolineras cargadas:', gasolineras.length, '· países:', data.paises_incluidos);
+  }catch(e){
+    console.error('Error al cargar gasolineras.json:', e);
+    gasolineras = [];
+  }
+}
+
+/* Precio de una estación para un campo de combustible dado (con fallback al campo
+   alternativo si el principal no existe, p.ej. diesel -> dieselPlus). */
+function priceForField(estacion, field, fieldAlt){
+  const p = estacion.precios || {};
+  if (typeof p[field] === 'number') return p[field];
+  if (fieldAlt && typeof p[fieldAlt] === 'number') return p[fieldAlt];
+  return null;
+}
+
+/* Percentiles de precio (para pintar el icono verde/ámbar/rojo) calculados sobre TODAS
+   las estaciones cargadas que tienen ese combustible. Se recalculan solo cuando cambia
+   mapLabelFuel, no en cada frame. */
+let _priceStatsCache = {};
+function getPriceStats(field){
+  if (_priceStatsCache[field]) return _priceStatsCache[field];
+  const vals = gasolineras.map(g => priceForField(g, field, null)).filter(v => v != null).sort((a,b) => a-b);
+  if (!vals.length){ _priceStatsCache[field] = null; return null; }
+  const p33 = vals[Math.floor(vals.length*0.33)];
+  const p66 = vals[Math.floor(vals.length*0.66)];
+  const stats = { p33, p66, min: vals[0], max: vals[vals.length-1] };
+  _priceStatsCache[field] = stats;
+  return stats;
+}
+function priceColorFor(price, field){
+  const stats = getPriceStats(field);
+  if (!stats || price == null) return '#9aa3b2';
+  if (price <= stats.p33) return '#00e676'; // barata
+  if (price <= stats.p66) return '#ffab00'; // media
+  return '#ff3d1f'; // cara
+}
+
+function gasolinerasToGeoJSON(){
+  const field = MAP_LABEL_FUELS.find(f => f.key === mapLabelFuel) || MAP_LABEL_FUELS[0];
+  const features = [];
+  gasolineras.forEach((g, index) => {
+    const price = priceForField(g, mapLabelFuel, null);
+    if (price == null) return; // esta estación no vende ese combustible, no la pintamos
+    features.push({
+      type: 'Feature',
+      geometry: { type: 'Point', coordinates: [g.lon, g.lat] },
+      properties: { idx: index, price, color: priceColorFor(price, mapLabelFuel), rotulo: g.rotulo || '' }
+    });
+  });
+  return { type: 'FeatureCollection', features };
+}
+
+function setupGasolinerasClusterLayer(){
+  if (!gasolineras.length) return;
+  _priceStatsCache = {}; // el dataset cambia poco, pero por seguridad recalculamos
+
+  if (map.getSource('gasolineras-src')){
+    map.getSource('gasolineras-src').setData(gasolinerasToGeoJSON());
+    return;
+  }
+
+  map.addSource('gasolineras-src', {
+    type: 'geojson', data: gasolinerasToGeoJSON(),
+    cluster: true, clusterMaxZoom: 14, clusterRadius: 60
+  });
+
+  map.addLayer({
+    id: 'gas-clusters', type: 'circle', source: 'gasolineras-src', filter: ['has','point_count'],
+    layout: { visibility: gasolinerasVisible ? 'visible' : 'none' },
+    paint: {
+      'circle-color': 'rgba(0,145,214,0.85)',
+      'circle-radius': ['step', ['get','point_count'], 14, 8, 18, 20, 24],
+      'circle-stroke-width': 2, 'circle-stroke-color': 'rgba(255,255,255,0.9)'
+    }
+  });
+  map.addLayer({
+    id: 'gas-cluster-icon', type: 'symbol', source: 'gasolineras-src', filter: ['has','point_count'],
+    layout: { 'text-field': '⛽', 'text-size': 12, 'text-offset': [0,-1], 'text-allow-overlap': true, visibility: gasolinerasVisible ? 'visible' : 'none' }
+  });
+  map.addLayer({
+    id: 'gas-cluster-count', type: 'symbol', source: 'gasolineras-src', filter: ['has','point_count'],
+    layout: { 'text-field': ['get','point_count_abbreviated'], 'text-font': ['Open Sans Bold'], 'text-size': 11, 'text-allow-overlap': true, visibility: gasolinerasVisible ? 'visible' : 'none' },
+    paint: { 'text-color': '#ffffff' }
+  });
+
+  map.addLayer({
+    id: 'gasolineras-badge', type: 'circle', source: 'gasolineras-src', filter: ['!', ['has','point_count']], minzoom: 13,
+    layout: { visibility: gasolinerasVisible ? 'visible' : 'none' },
+    paint: {
+      'circle-radius': ['interpolate', ['linear'], ['zoom'], 13, 7, 16, 12],
+      'circle-color': ['get','color'],
+      'circle-stroke-width': 2, 'circle-stroke-color': '#ffffff', 'circle-opacity': 0.96
+    }
+  });
+  map.addLayer({
+    id: 'gasolineras-icon', type: 'symbol', source: 'gasolineras-src', filter: ['!', ['has','point_count']], minzoom: 13,
+    layout: { 'text-field': '⛽', 'text-size': 10, 'text-allow-overlap': true, visibility: gasolinerasVisible ? 'visible' : 'none' }
+  });
+  map.addLayer({
+    id: 'gasolineras-label', type: 'symbol', source: 'gasolineras-src', filter: ['!', ['has','point_count']], minzoom: 14.5,
+    layout: {
+      'text-field': ['concat', ['to-string', ['get','price']], '€'], 'text-size': 10,
+      'text-offset': [0,1.6], 'text-font': ['Open Sans Bold'], visibility: gasolinerasVisible ? 'visible' : 'none'
+    },
+    paint: { 'text-color': '#8fd6ff', 'text-halo-color': '#000', 'text-halo-width': 1.1 }
+  });
+
+  map.on('click', 'gas-clusters', (e) => {
+    const features = map.queryRenderedFeatures(e.point, { layers: ['gas-clusters'] });
+    const clusterId = features[0].properties.cluster_id;
+    map.getSource('gasolineras-src').getClusterExpansionZoom(clusterId, (err, zoom) => {
+      if (err) return;
+      map.easeTo({ center: features[0].geometry.coordinates, zoom: zoom + 0.4, duration: 500 });
+    });
+  });
+  map.on('click', 'gasolineras-badge', (e) => showGasolineraPopup(e));
+  ['gas-clusters','gasolineras-badge'].forEach(layer => {
+    map.on('mouseenter', layer, () => map.getCanvas().style.cursor = 'pointer');
+    map.on('mouseleave', layer, () => map.getCanvas().style.cursor = '');
+  });
+}
+
+function setGasolinerasLayersVisibility(visible){
+  gasolinerasVisible = visible;
+  const vis = visible ? 'visible' : 'none';
+  ['gas-clusters','gas-cluster-icon','gas-cluster-count','gasolineras-badge','gasolineras-icon','gasolineras-label'].forEach(l => {
+    if (map && map.getLayer(l)) map.setLayoutProperty(l, 'visibility', vis);
+  });
+}
+
+function precioListHTML(precios){
+  const NAMES = { gasolina95:'Gasolina 95', gasolina98:'Gasolina 98', diesel:'Diésel', dieselPlus:'Diésel+', glp:'GLP', gnc:'GNC', gasolina95E10:'Gasolina E10', e85:'E85' };
+  return Object.entries(precios || {}).map(([k,v]) => `<tr><td>${NAMES[k] || k}</td><td>${v.toFixed(3)} €</td></tr>`).join('');
+}
+function showGasolineraPopup(e){
+  const idx = e.features[0].properties.idx;
+  const g = gasolineras[idx];
+  if (!g) return;
+  const coords = e.features[0].geometry.coordinates.slice();
+  const dist = Math.round(getDistanceMeters(currentPos.lat, currentPos.lon, g.lat, g.lon));
+  const html = `<div class="radar-popup">
+      <div class="popup-title" style="color:#0091d6;">⛽ ${g.rotulo || 'Gasolinera'}</div>
+      <div style="font-size:0.76rem;color:var(--text-muted);margin-top:2px;">${g.direccion || ''}${g.municipio ? ', ' + g.municipio : ''}</div>
+      <table>${precioListHTML(g.precios)}<tr><td>Distancia</td><td>${dist} m</td></tr></table>
+    </div>`;
+  new maplibregl.Popup({ closeButton: true, offset: 14 }).setLngLat(coords).setHTML(html).addTo(map);
+}
+
+/* Gasolineras siempre visibles sobre la ruta activa (igual que route-radares-badge),
+   independientemente del zoom, para que se vean de un vistazo al planificar el viaje. */
+function setRouteHighlightGasolineras(matched){
+  const feats = matched.map(m => ({
+    type:'Feature', geometry:{ type:'Point', coordinates:[m.estacion.lon, m.estacion.lat] },
+    properties:{ idx:m.idx, price:m.price, color:priceColorFor(m.price, currentFuelPriceField()), rotulo:m.estacion.rotulo || '' }
+  }));
+  const data = { type:'FeatureCollection', features: feats };
+
+  if (map.getSource('route-gasolineras-src')){
+    map.getSource('route-gasolineras-src').setData(data);
+  } else {
+    map.addSource('route-gasolineras-src', { type:'geojson', data });
+    map.addLayer({
+      id:'route-gasolineras-badge', type:'circle', source:'route-gasolineras-src',
+      paint:{
+        'circle-radius': ['interpolate',['linear'],['zoom'],7,8,12,12,16,17],
+        'circle-color': ['get','color'], 'circle-stroke-width':3, 'circle-stroke-color':'#ffffff', 'circle-opacity':0.98
+      }
+    });
+    map.addLayer({
+      id:'route-gasolineras-icon', type:'symbol', source:'route-gasolineras-src',
+      layout:{ 'text-field':'⛽', 'text-size':['interpolate',['linear'],['zoom'],7,9,16,14], 'text-allow-overlap':true }
+    });
+    map.addLayer({
+      id:'route-gasolineras-label', type:'symbol', source:'route-gasolineras-src', minzoom: 10,
+      layout:{ 'text-field': ['concat', ['to-string', ['get','price']], '€'], 'text-size':10, 'text-offset':[0,1.7], 'text-font':['Open Sans Bold'] },
+      paint:{ 'text-color':'#8fd6ff', 'text-halo-color':'#000', 'text-halo-width':1.1 }
+    });
+    map.on('click', 'route-gasolineras-badge', (e) => showGasolineraPopup(e));
+    map.on('mouseenter', 'route-gasolineras-badge', () => map.getCanvas().style.cursor = 'pointer');
+    map.on('mouseleave', 'route-gasolineras-badge', () => map.getCanvas().style.cursor = '');
+  }
+}
+function clearRouteHighlightGasolineras(){
+  if (map.getSource('route-gasolineras-src')) map.getSource('route-gasolineras-src').setData({ type:'FeatureCollection', features: [] });
+}
+
+function currentFuelPriceField(){
+  const ft = FUEL_TYPES[vehicleFuelType];
+  return ft ? ft.priceField : null;
+}
+
+/* Busca gasolineras a <300m de la ruta (mismo algoritmo acotado por bounding-box que
+   markRadaresOnRoute, para no perder cobertura en rutas largas), calcula la más barata
+   y el precio medio, y actualiza toda la tarjeta de coste. Vehículos eléctricos no
+   buscan estaciones: usan directamente el precio manual de carga. */
+function markGasolinerasOnRoute(coords){
+  const field = currentFuelPriceField();
+  if (!field || !gasolineras.length){
+    routeGasolinerasStats = null;
+    clearRouteHighlightGasolineras();
+    updateFuelCostUI();
+    return;
+  }
+
+  let minLat=90,maxLat=-90,minLon=180,maxLon=-180;
+  for (const c of coords){
+    if (c[1]<minLat) minLat=c[1]; if (c[1]>maxLat) maxLat=c[1];
+    if (c[0]<minLon) minLon=c[0]; if (c[0]>maxLon) maxLon=c[0];
+  }
+  const buf = 0.03;
+  minLat-=buf; maxLat+=buf; minLon-=buf; maxLon+=buf;
+
+  const ftMeta = FUEL_TYPES[vehicleFuelType];
+  const candidates = [];
+  gasolineras.forEach((g, index) => {
+    if (g.lat < minLat || g.lat > maxLat || g.lon < minLon || g.lon > maxLon) return;
+    const price = priceForField(g, ftMeta.priceField, ftMeta.priceFieldAlt);
+    if (price == null) return;
+    candidates.push({ idx: index, estacion: g, lat: g.lat, lon: g.lon, price });
+  });
+
+  const matched = [];
+  const found = new Set();
+  for (let i = 0; i < coords.length && found.size < candidates.length; i++){
+    const clat = coords[i][1], clon = coords[i][0];
+    for (const cand of candidates){
+      if (found.has(cand.idx)) continue;
+      if (getDistanceMeters(clat, clon, cand.lat, cand.lon) < 400){
+        found.add(cand.idx);
+        matched.push(cand);
+      }
+    }
+  }
+
+  if (matched.length){
+    matched.forEach(m => { m.distFromUser = getDistanceMeters(currentPos.lat, currentPos.lon, m.lat, m.lon); });
+    matched.sort((a,b) => a.price - b.price);
+    const avgPrice = matched.reduce((s,m) => s + m.price, 0) / matched.length;
+    routeGasolinerasStats = { matched, cheapest: matched[0], avgPrice };
+    setRouteHighlightGasolineras(matched);
+  } else {
+    routeGasolinerasStats = null;
+    clearRouteHighlightGasolineras();
+  }
+  updateFuelCostUI();
+}
+
+/* Calcula y pinta la tarjeta de coste + la de estación más barata, según el tipo de
+   combustible seleccionado y las estaciones detectadas en la ruta activa. */
+function updateFuelCostUI(){
+  if (!fuelCostCard) return;
+  if (!routesData.length){ fuelCostCard.style.display = 'none'; cheapestStationCard.style.display = 'none'; return; }
+  const ft = FUEL_TYPES[vehicleFuelType];
+  const route = routesData[selectedRouteIdx];
+  const distanceKm = route ? route.distance/1000 : 0;
+
+  let unitPrice = vehiclePrice, sourceLabel = 'precio manual (ajustable en Ajustes)';
+  if (ft.priceField && routeGasolinerasStats && routeGasolinerasStats.avgPrice != null){
+    unitPrice = routeGasolinerasStats.avgPrice;
+    sourceLabel = `precio medio de ${routeGasolinerasStats.matched.length} gasolinera${routeGasolinerasStats.matched.length>1?'s':''} en tu ruta`;
+  } else if (ft.priceField){
+    sourceLabel = 'sin gasolineras detectadas en la ruta, usando tu precio manual';
+  }
+
+  const cost = distanceKm * (vehicleConsumption/100) * unitPrice;
+  fuelCostCard.style.display = 'flex';
+  fuelCostIcon.textContent = ft.icon;
+  fuelCostLabel.textContent = `Coste estimado · ${ft.label}`;
+  fuelCostValue.textContent = `${cost.toFixed(2)} €`;
+  fuelCostSub.textContent = `${distanceKm.toFixed(1)} km · ${vehicleConsumption} ${ft.unit} · ${unitPrice.toFixed(ft.priceField ? 3 : 2)} ${ft.priceUnit} (${sourceLabel})`;
+
+  if (ft.priceField && routeGasolinerasStats && routeGasolinerasStats.cheapest){
+    const c = routeGasolinerasStats.cheapest;
+    const savings = (routeGasolinerasStats.avgPrice - c.price) * (vehicleConsumption/100) * distanceKm;
+    cheapestStationCard.style.display = 'flex';
+    cheapestStationName.textContent = c.estacion.rotulo || 'Gasolinera';
+    cheapestStationDetail.textContent = `${c.estacion.municipio || c.estacion.direccion || ''} · a ${(c.distFromUser/1000).toFixed(1)} km de ti${savings > 0.05 ? ` · ahorras ~${savings.toFixed(2)}€ vs la media` : ''}`;
+    cheapestStationPrice.textContent = `${c.price.toFixed(3)}€`;
+    cheapestStationCard.onclick = () => {
+      map.flyTo({ center:[c.lon, c.lat], zoom: 15.5, duration: 800 });
+      setTimeout(() => {
+        const feat = { features: [{ properties:{ idx: c.idx }, geometry:{ coordinates:[c.lon, c.lat] } }] };
+        showGasolineraPopup(feat);
+      }, 850);
+    };
+  } else {
+    cheapestStationCard.style.display = 'none';
+  }
+}
+
+/* ============================================================
    BÚSQUEDA — motor tipo Google/Waze
    Nominatim (el que usábamos) está pensado para geocodificar direcciones
    completas, no para autocompletar mientras escribes: no hace "prefix
@@ -1407,7 +1845,7 @@ function renderSearchResults(data){
   });
 }
 
-document.getElementById('chipFuel').addEventListener('click', () => quickPoiSearch('gasolinera'));
+document.getElementById('chipFuel').addEventListener('click', () => showNearbyGasolinerasList());
 document.getElementById('chipParking').addEventListener('click', () => quickPoiSearch('parking'));
 document.getElementById('chipHome').addEventListener('click', () => alert('Guarda tu dirección de Casa buscándola (favoritos disponibles próximamente).'));
 document.getElementById('chipWork').addEventListener('click', () => alert('Guarda tu dirección de Trabajo buscándola (favoritos disponibles próximamente).'));
@@ -1416,6 +1854,51 @@ async function quickPoiSearch(term){
   destInput.value = term; searchClear.style.display = 'block';
   lastSearchQuery = term;
   renderSearchResults(await runSearch(term, true));
+}
+
+/* Chip "Gasolinera cercana": en vez de tirar del geocoder genérico (que no sabe de
+   precios), usamos directamente gasolineras.json — mucho más útil, y es justo el dato
+   diferencial que tiene esta app. Ordena por precio del combustible del vehículo
+   seleccionado, no solo por distancia. Si el vehículo es eléctrico (sin priceField) o
+   el dataset aún no ha cargado, cae al buscador genérico como red de seguridad. */
+function showNearbyGasolinerasList(){
+  const ft = FUEL_TYPES[vehicleFuelType];
+  if (!ft.priceField || !gasolineras.length){
+    quickPoiSearch('gasolinera');
+    return;
+  }
+  destInput.value = `Gasolineras · ${ft.label}`; searchClear.style.display = 'block';
+
+  const nearby = gasolineras
+    .map((g, idx) => {
+      const price = priceForField(g, ft.priceField, ft.priceFieldAlt);
+      if (price == null) return null;
+      const dist = getDistanceMeters(currentPos.lat, currentPos.lon, g.lat, g.lon);
+      return { idx, g, price, dist };
+    })
+    .filter(x => x && x.dist < 30000) // 30 km a la redonda
+    .sort((a,b) => a.price - b.price)
+    .slice(0, 20);
+
+  searchResults.innerHTML = '';
+  if (!nearby.length){
+    searchResults.style.display = 'none';
+    searchEmpty.style.display = 'block';
+    searchEmpty.textContent = 'No hay gasolineras con datos de precio en 30 km a la redonda. Prueba buscando la zona manualmente.';
+    return;
+  }
+  searchEmpty.style.display = 'none';
+  searchResults.style.display = 'flex';
+  nearby.forEach(({ g, price, dist }) => {
+    const distKm = (dist/1000).toFixed(dist < 10000 ? 1 : 0);
+    const div = document.createElement('div');
+    div.className = 'search-result-item';
+    div.innerHTML = `<div class="result-icon">${ft.icon}</div>
+      <div class="result-text"><div class="result-main">${g.rotulo || 'Gasolinera'}</div><div class="result-sub">${g.municipio || g.direccion || ''} · ${distKm} km</div></div>
+      <div class="result-price-badge">${price.toFixed(3)}€</div>`;
+    div.onclick = () => selectDestination({ name: g.rotulo || 'Gasolinera', lat: g.lat, lon: g.lon });
+    searchResults.appendChild(div);
+  });
 }
 
 /* ============================================================
@@ -1433,6 +1916,8 @@ async function selectDestination(place){
   previewEta.textContent = '';
   routeRadaresCount.textContent = 'Analizando radares en el camino…';
   routeVariants.style.display = 'none';
+  fuelCostCard.style.display = 'none';
+  cheapestStationCard.style.display = 'none';
   routePreviewSheet.style.display = 'flex';
 
   map.flyTo({ center: [selectedDestination.lon, selectedDestination.lat], zoom: 9, pitch: 0, bearing: 0 });
@@ -1497,6 +1982,7 @@ function applySelectedRoute(){
 
   drawRoutes();
   markRadaresOnRoute(routeCoords);
+  markGasolinerasOnRoute(routeCoords);
 }
 
 function drawRoutes(){
@@ -1540,6 +2026,8 @@ function removeRouteLayers(){
   ['route-src','route-alt-src'].forEach(s => { if (map.getSource(s)) map.removeSource(s); });
   ['route-radares-badge','route-radares-icon','route-radares-label'].forEach(l => { if (map.getLayer(l)) map.removeLayer(l); });
   if (map.getSource('route-radares-src')) map.removeSource('route-radares-src');
+  ['route-gasolineras-badge','route-gasolineras-icon','route-gasolineras-label'].forEach(l => { if (map.getLayer(l)) map.removeLayer(l); });
+  if (map.getSource('route-gasolineras-src')) map.removeSource('route-gasolineras-src');
 }
 
 function markRadaresOnRoute(coords){
@@ -1626,7 +2114,9 @@ cancelPreviewBtn.addEventListener('click', () => {
   routePreviewSheet.style.display = 'none';
   searchSheet.style.display = 'block';
   destInput.value = ''; searchClear.style.display = 'none';
-  removeRouteLayers(); clearRouteHighlightRadares();
+  removeRouteLayers(); clearRouteHighlightRadares(); clearRouteHighlightGasolineras();
+  routeGasolinerasStats = null;
+  fuelCostCard.style.display = 'none'; cheapestStationCard.style.display = 'none';
   routeCoords = []; routesData = []; routeAnnotationSpeeds = [];
   map.flyTo({ center: [currentPos.lon, currentPos.lat], zoom: 15 });
 });
@@ -1642,7 +2132,8 @@ function stopNavigation(msg){
   if (msg) speak(msg);
   if (watchId !== null) navigator.geolocation.clearWatch(watchId);
   if (tripStats) finalizeTripStats(false); // viaje detenido a mitad: se guarda como incompleto
-  removeRouteLayers(); clearRouteHighlightRadares();
+  removeRouteLayers(); clearRouteHighlightRadares(); clearRouteHighlightGasolineras();
+  routeGasolinerasStats = null;
   routeCoords = []; routesData = []; routeAnnotationSpeeds = [];
   map.easeTo({ pitch: 0, bearing: 0, duration: 700 });
 }
@@ -2140,9 +2631,10 @@ function updateCopilotPreview(){
 updateCopilotPreview();
 
 // vehículo / coste
-const vehicleTypeSegmented = document.getElementById('vehicleTypeSegmented');
 const vehicleConsumptionInput = document.getElementById('vehicleConsumptionInput');
 const vehiclePriceInput = document.getElementById('vehiclePriceInput');
+const vehicleFuelTypeRow = document.getElementById('vehicleFuelTypeRow');
+const vehicleFuelNote = document.getElementById('vehicleFuelNote');
 
 const carPresetSelect = document.getElementById('carPresetSelect');
 const brandsSorted = [...new Set(CAR_PRESETS.map(c => c.brand))].sort();
@@ -2152,7 +2644,7 @@ brandsSorted.forEach(brand => {
   CAR_PRESETS.filter(c => c.brand === brand).forEach(c => {
     const opt = document.createElement('option');
     opt.value = `${c.brand}|${c.model}`;
-    opt.textContent = `${c.model}${c.type === 'electric' ? ' ⚡' : ''}`;
+    opt.textContent = `${c.model} ${FUEL_TYPES[c.type].icon}`;
     group.appendChild(opt);
   });
   carPresetSelect.appendChild(group);
@@ -2162,47 +2654,98 @@ carPresetSelect.addEventListener('change', () => {
   const [brand, model] = carPresetSelect.value.split('|');
   const preset = CAR_PRESETS.find(c => c.brand === brand && c.model === model);
   if (!preset) return;
-  vehicleType = preset.type;
-  vehicleTypeSegmented.querySelectorAll('button').forEach(b => b.classList.toggle('active', b.dataset.val === preset.type));
   vehicleConsumption = preset.consumption;
-  if (preset.type === 'electric'){
-    vehicleConsumptionInput.min = 8; vehicleConsumptionInput.max = 35; vehicleConsumptionInput.step = 0.5;
-    vehiclePriceInput.min = 0.05; vehiclePriceInput.max = 0.60; vehiclePriceInput.step = 0.01;
-    if (vehiclePrice > 0.60) vehiclePrice = 0.15;
-  } else {
-    vehicleConsumptionInput.min = 2; vehicleConsumptionInput.max = 20; vehicleConsumptionInput.step = 0.5;
-    vehiclePriceInput.min = 0.50; vehiclePriceInput.max = 2.50; vehiclePriceInput.step = 0.05;
-    if (vehiclePrice < 0.50) vehiclePrice = 1.65;
-  }
+  setVehicleFuelType(preset.type, false);
   vehicleConsumptionInput.value = vehicleConsumption;
-  vehiclePriceInput.value = vehiclePrice;
   updateVehicleUnitLabels();
 });
-function updateVehicleUnitLabels(){
-  const unit = vehicleType === 'electric' ? 'kWh/100km' : 'L/100km';
-  const priceUnit = vehicleType === 'electric' ? '€/kWh' : '€/L';
-  document.getElementById('vehicleConsumptionVal').textContent = `${vehicleConsumption} ${unit}`;
-  document.getElementById('vehiclePriceVal').textContent = `${vehiclePrice.toFixed(2)} ${priceUnit}`;
+
+/* Cambia el tipo de combustible en TODO el sitio donde afecta: sliders de ajustes,
+   picker rápido del preview de ruta, y recalcula coste + gasolineras en la ruta activa
+   si hay una en curso. resetToDefaults=true cuando el usuario pulsa un tipo directamente
+   (recarga consumo/precio por defecto); false cuando viene de elegir coche del desplegable
+   (el consumo ya lo trae el preset, solo hay que ajustar el rango del slider de precio). */
+function setVehicleFuelType(type, resetToDefaults){
+  vehicleFuelType = type;
+  const ft = FUEL_TYPES[type];
+  vehicleConsumptionInput.min = ft.consMin; vehicleConsumptionInput.max = ft.consMax; vehicleConsumptionInput.step = ft.consStep;
+  vehiclePriceInput.min = ft.priceMin; vehiclePriceInput.max = ft.priceMax; vehiclePriceInput.step = ft.priceStep;
+  if (resetToDefaults){
+    vehicleConsumption = ft.defaultConsumption;
+    vehicleConsumptionInput.value = vehicleConsumption;
+  }
+  if (vehiclePrice < ft.priceMin || vehiclePrice > ft.priceMax) vehiclePrice = ft.defaultPrice;
+  vehiclePriceInput.value = vehiclePrice;
+  carPresetSelect.value = '';
+
+  vehicleFuelTypeRow.querySelectorAll('.style-pick').forEach(b => b.classList.toggle('selected', b.dataset.fuel === type));
+  if (fuelPickerRow) fuelPickerRow.querySelectorAll('.fuel-pick').forEach(b => b.classList.toggle('selected', b.dataset.fuel === type));
+
+  vehicleFuelNote.style.display = ft.note ? 'block' : 'none';
+  if (ft.note) vehicleFuelNote.textContent = ft.note;
+
+  updateVehicleUnitLabels();
+  if (routeCoords.length){ markGasolinerasOnRoute(routeCoords); } else { updateFuelCostUI(); }
 }
-vehicleTypeSegmented.querySelectorAll('button').forEach(btn => {
-  btn.addEventListener('click', () => {
-    vehicleTypeSegmented.querySelectorAll('button').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    vehicleType = btn.dataset.val;
-    carPresetSelect.value = '';
-    if (vehicleType === 'electric'){
-      vehicleConsumptionInput.min = 8; vehicleConsumptionInput.max = 35; vehicleConsumptionInput.step = 0.5; vehicleConsumptionInput.value = vehicleConsumption = 18;
-      vehiclePriceInput.min = 0.05; vehiclePriceInput.max = 0.60; vehiclePriceInput.step = 0.01; vehiclePriceInput.value = vehiclePrice = 0.15;
-    } else {
-      vehicleConsumptionInput.min = 2; vehicleConsumptionInput.max = 20; vehicleConsumptionInput.step = 0.5; vehicleConsumptionInput.value = vehicleConsumption = 6.5;
-      vehiclePriceInput.min = 0.50; vehiclePriceInput.max = 2.50; vehiclePriceInput.step = 0.05; vehiclePriceInput.value = vehiclePrice = 1.65;
-    }
-    updateVehicleUnitLabels();
-  });
+
+// construir los 5 botones de tipo de combustible en Ajustes
+FUEL_TYPE_ORDER.forEach(key => {
+  const ft = FUEL_TYPES[key];
+  const el = document.createElement('div');
+  el.className = 'style-pick' + (key === vehicleFuelType ? ' selected' : '');
+  el.dataset.fuel = key;
+  el.innerHTML = `${ft.icon} ${ft.label}`;
+  el.addEventListener('click', () => setVehicleFuelType(key, true));
+  vehicleFuelTypeRow.appendChild(el);
 });
-vehicleConsumptionInput.addEventListener('input', (e) => { vehicleConsumption = parseFloat(e.target.value); carPresetSelect.value=''; updateVehicleUnitLabels(); });
-vehiclePriceInput.addEventListener('input', (e) => { vehiclePrice = parseFloat(e.target.value); updateVehicleUnitLabels(); });
-updateVehicleUnitLabels();
+
+// construir el mismo picker, en formato compacto, dentro del preview de ruta
+FUEL_TYPE_ORDER.forEach(key => {
+  const ft = FUEL_TYPES[key];
+  const el = document.createElement('div');
+  el.className = 'fuel-pick' + (key === vehicleFuelType ? ' selected' : '');
+  el.dataset.fuel = key;
+  el.innerHTML = `<span class="fp-icon">${ft.icon}</span><span class="fp-label">${ft.label}</span>`;
+  el.addEventListener('click', () => setVehicleFuelType(key, true));
+  fuelPickerRow.appendChild(el);
+});
+
+function updateVehicleUnitLabels(){
+  const ft = FUEL_TYPES[vehicleFuelType];
+  document.getElementById('vehicleConsumptionVal').textContent = `${vehicleConsumption} ${ft.unit}`;
+  document.getElementById('vehiclePriceVal').textContent = `${vehiclePrice.toFixed(ft.priceField ? 2 : 2)} ${ft.priceUnit}`;
+}
+vehicleConsumptionInput.addEventListener('input', (e) => {
+  vehicleConsumption = parseFloat(e.target.value); carPresetSelect.value = ''; updateVehicleUnitLabels();
+  if (routeCoords.length) updateFuelCostUI();
+});
+vehiclePriceInput.addEventListener('input', (e) => {
+  vehiclePrice = parseFloat(e.target.value); updateVehicleUnitLabels();
+  if (routeCoords.length) updateFuelCostUI();
+});
+setVehicleFuelType(vehicleFuelType, true);
+
+// gasolineras: visibilidad de capa + combustible mostrado en el icono del mapa
+const gasolinerasVisibleSwitch = document.getElementById('gasolinerasVisibleSwitch');
+gasolinerasVisibleSwitch.classList.toggle('on', gasolinerasVisible);
+gasolinerasVisibleSwitch.addEventListener('click', () => {
+  setGasolinerasLayersVisibility(!gasolinerasVisible);
+  gasolinerasVisibleSwitch.classList.toggle('on', gasolinerasVisible);
+});
+
+const mapLabelFuelRow = document.getElementById('mapLabelFuelRow');
+MAP_LABEL_FUELS.forEach(f => {
+  const el = document.createElement('div');
+  el.className = 'style-pick' + (f.key === mapLabelFuel ? ' selected' : '');
+  el.dataset.fuel = f.key;
+  el.innerHTML = `${f.icon} ${f.label}`;
+  el.addEventListener('click', () => {
+    mapLabelFuel = f.key;
+    mapLabelFuelRow.querySelectorAll('.style-pick').forEach(b => b.classList.toggle('selected', b.dataset.fuel === f.key));
+    if (map && gasolineras.length) setupGasolinerasClusterLayer();
+  });
+  mapLabelFuelRow.appendChild(el);
+});
 
 // reinicio manual del mapa (radares/rutas)
 document.getElementById('resetMapBtn').addEventListener('click', () => {
@@ -2260,7 +2803,7 @@ function tripStatRowHTML(t, live){
   const underMin = (live ? t.timeUnderPaceMs : t.timeUnderPaceMs)/60000;
   const harshA = t.harshAccelCount, harshB = t.harshBrakeCount;
   const cost = live ? estimateFuelCost(distanceKm) : t.fuelCost;
-  const costUnit = vehicleType === 'electric' ? 'kWh' : 'L';
+  const costUnit = FUEL_TYPES[vehicleFuelType].priceField ? 'L' : 'kWh';
 
   return `
     <div class="trip-stat-grid">
