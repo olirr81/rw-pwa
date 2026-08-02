@@ -263,6 +263,13 @@ body{
 .cheapest-station-card .cs-detail{ font-size:0.68rem; color:var(--text-muted); margin-top:1px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .cheapest-station-card .cs-price{ font-family:'JetBrains Mono'; font-weight:800; color:var(--success); font-size:1.05rem; flex-shrink:0; }
 
+.peaje-cost-card{ display:flex; align-items:center; justify-content:space-between; padding:11px 14px; border-radius:15px;
+  background:rgba(255,171,0,0.09); border:1px solid rgba(255,171,0,0.3); }
+.peaje-cost-card .pc-label{ font-size:0.66rem; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.05em; font-weight:700; display:flex; align-items:center; gap:5px; }
+.peaje-cost-card .pc-value{ font-family:'JetBrains Mono'; font-size:1.15rem; font-weight:800; color:var(--warn); margin-top:2px; }
+.peaje-cost-card .pc-sub{ font-size:0.62rem; color:var(--text-muted); margin-top:3px; max-width:220px; }
+.peaje-cost-card .pc-icon{ font-size:1.5rem; flex-shrink:0; }
+
 .route-buttons{ display:flex; gap:12px; margin-top:2px; }
 .btn-cancel-route{ flex:1; background:var(--surface-2); color:var(--text); padding:15px; border-radius:15px; border:1px solid var(--border); font-weight:700; cursor:pointer; font-family:'Space Grotesk'; font-size:0.95rem; }
 .btn-go-route{
@@ -512,6 +519,15 @@ body.theme-day .segmented button.active{ color:#fff; }
       <div class="cs-price" id="cheapestStationPrice">--</div>
     </div>
 
+    <div class="peaje-cost-card" id="peajeCostCard" style="display:none;">
+      <div>
+        <div class="pc-label">🛣️ <span>Peaje estimado</span></div>
+        <div class="pc-value" id="peajeCostValue">≈ -- €</div>
+        <div class="pc-sub" id="peajeCostSub"></div>
+      </div>
+      <div class="pc-icon">🚧</div>
+    </div>
+
     <div class="route-radares-tag" id="routeRadaresTag">
       <span>📷</span> <span id="routeRadaresCount">Calculando radares…</span>
     </div>
@@ -602,6 +618,15 @@ body.theme-day .segmented button.active{ color:#fff; }
         <div class="style-row" id="mapLabelFuelRow"></div>
       </div>
       <div class="copilot-preview" id="gasolinerasFreshnessNote" style="display:none;"></div>
+
+      <div class="poi-subtitle">🛣️ Peajes</div>
+      <div class="toggle-row">
+        <div>
+          <div class="label">Mostrar peajes</div>
+          <div class="sub">Ubicaciones reales (OSM) en ES/FR/IT. El coste que verás en la ruta es una estimación con tarifa media, no el precio oficial del tramo.</div>
+        </div>
+        <div class="switch on" id="peajesVisibleSwitch"></div>
+      </div>
     </div>
 
     <div class="divider"></div>
@@ -883,6 +908,12 @@ let gasolinerasVisible = true;
 let mapLabelFuel = 'gasolina95'; // qué precio se muestra en el icono del mapa (independiente del coche)
 let routeGasolinerasStats = null; // { matched:[], cheapest, avgPrice } de la ruta activa, para el fuel type actual
 
+/* ---- peajes ---- */
+let peajes = [];
+let peajesVisible = true;
+let peajesTarifasMediasKm = {}; // {ES:0.10, FR:0.10, IT:0.09} tal como venga en peajes.json
+let routePeajesStats = null; // { matched:[], tolledKm, cost, paisDominante } de la ruta activa
+
 /* ---------- DOM refs ---------- */
 const destInput = document.getElementById('destInput');
 const searchClear = document.getElementById('searchClear');
@@ -915,6 +946,9 @@ const cheapestStationCard = document.getElementById('cheapestStationCard');
 const cheapestStationName = document.getElementById('cheapestStationName');
 const cheapestStationDetail = document.getElementById('cheapestStationDetail');
 const cheapestStationPrice = document.getElementById('cheapestStationPrice');
+const peajeCostCard = document.getElementById('peajeCostCard');
+const peajeCostValue = document.getElementById('peajeCostValue');
+const peajeCostSub = document.getElementById('peajeCostSub');
 const goRouteBtn = document.getElementById('goRouteBtn');
 const cancelPreviewBtn = document.getElementById('cancelPreviewBtn');
 const stopNavBtn = document.getElementById('stopNavBtn');
@@ -1080,9 +1114,10 @@ function initMap(){
 
   map.on('load', async () => {
     styleReady = true;
-    await Promise.all([loadRadaresData(), loadGasolinerasData()]);
+    await Promise.all([loadRadaresData(), loadGasolinerasData(), loadPeajesData()]);
     setupRadaresClusterLayer();
     setupGasolinerasClusterLayer();
+    setupPeajesClusterLayer();
     initRealGPS();
   });
 }
@@ -1127,16 +1162,19 @@ function forceRebuildAllLayers(){
      'radares-label','radares-icon','radares-badge','cluster-count','cluster-icon','clusters',
      'route-gasolineras-label','route-gasolineras-icon','route-gasolineras-badge',
      'gasolineras-label','gasolineras-icon','gasolineras-badge','gas-cluster-count','gas-cluster-icon','gas-clusters',
+     'route-peajes-icon','route-peajes-badge','peajes-icon','peajes-badge','peaje-cluster-count','peaje-cluster-icon','peaje-clusters',
      'route-layer','route-glow','route-alt-layer'].forEach(l => { if (map.getLayer(l)) map.removeLayer(l); });
-    ['route-radares-src','radares-src','route-gasolineras-src','gasolineras-src','route-src','route-alt-src'].forEach(s => { if (map.getSource(s)) map.removeSource(s); });
+    ['route-radares-src','radares-src','route-gasolineras-src','gasolineras-src','route-peajes-src','peajes-src','route-src','route-alt-src'].forEach(s => { if (map.getSource(s)) map.removeSource(s); });
   }catch(e){ console.warn('Limpieza de capas incompleta:', e); }
 
   if (radares.length) setupRadaresClusterLayer();
   if (gasolineras.length) setupGasolinerasClusterLayer();
+  if (peajes.length) setupPeajesClusterLayer();
   if (routeCoords.length && routesData.length){
     drawRoutes();
     markRadaresOnRoute(routeCoords);
     markGasolinerasOnRoute(routeCoords);
+    markPeajesOnRoute(routeCoords);
   }
 }
 
@@ -1702,6 +1740,224 @@ function updateFuelCostUI(){
 }
 
 /* ============================================================
+   PEAJES: ubicaciones reales (OSM/Overpass), coste ESTIMADO con
+   tarifa media por país — nunca oficial, siempre marcado como aproximado
+   ============================================================ */
+async function loadPeajesData(){
+  try{
+    const res = await fetch('peajes.json?v=' + Date.now());
+    const data = await res.json();
+    peajes = data.peajes || [];
+    peajesTarifasMediasKm = data.tarifas_medias_km || {};
+    console.log('Peajes cargados:', peajes.length, '· países:', data.paises_incluidos);
+  }catch(e){
+    console.error('Error al cargar peajes.json:', e);
+    peajes = [];
+  }
+}
+
+function peajesToGeoJSON(){
+  return {
+    type: 'FeatureCollection',
+    features: peajes.map((p, index) => ({
+      type: 'Feature',
+      geometry: { type: 'Point', coordinates: [p.lon, p.lat] },
+      properties: { idx: index, tipo: p.tipo, nombre: p.nombre || '', via: p.via || '' }
+    }))
+  };
+}
+
+function setupPeajesClusterLayer(){
+  if (!peajes.length) return;
+  if (map.getSource('peajes-src')){ map.getSource('peajes-src').setData(peajesToGeoJSON()); return; }
+
+  map.addSource('peajes-src', {
+    type: 'geojson', data: peajesToGeoJSON(), cluster: true, clusterMaxZoom: 13, clusterRadius: 60
+  });
+  map.addLayer({
+    id: 'peaje-clusters', type: 'circle', source: 'peajes-src', filter: ['has','point_count'],
+    layout: { visibility: peajesVisible ? 'visible' : 'none' },
+    paint: { 'circle-color': 'rgba(255,171,0,0.85)', 'circle-radius': ['step', ['get','point_count'], 13, 6, 17, 15, 22],
+      'circle-stroke-width': 2, 'circle-stroke-color': 'rgba(255,255,255,0.9)' }
+  });
+  map.addLayer({
+    id: 'peaje-cluster-icon', type: 'symbol', source: 'peajes-src', filter: ['has','point_count'],
+    layout: { 'text-field': '🛣️', 'text-size': 11, 'text-offset': [0,-1], 'text-allow-overlap': true, visibility: peajesVisible ? 'visible' : 'none' }
+  });
+  map.addLayer({
+    id: 'peaje-cluster-count', type: 'symbol', source: 'peajes-src', filter: ['has','point_count'],
+    layout: { 'text-field': ['get','point_count_abbreviated'], 'text-font': ['Open Sans Bold'], 'text-size': 11, 'text-allow-overlap': true, visibility: peajesVisible ? 'visible' : 'none' },
+    paint: { 'text-color': '#ffffff' }
+  });
+  map.addLayer({
+    id: 'peajes-badge', type: 'circle', source: 'peajes-src', filter: ['!', ['has','point_count']], minzoom: 12,
+    layout: { visibility: peajesVisible ? 'visible' : 'none' },
+    paint: { 'circle-radius': ['interpolate',['linear'],['zoom'],12,7,16,12], 'circle-color': '#ffab00',
+      'circle-stroke-width': 2, 'circle-stroke-color': '#ffffff', 'circle-opacity': 0.96 }
+  });
+  map.addLayer({
+    id: 'peajes-icon', type: 'symbol', source: 'peajes-src', filter: ['!', ['has','point_count']], minzoom: 12,
+    layout: { 'text-field': '🛣️', 'text-size': 10, 'text-allow-overlap': true, visibility: peajesVisible ? 'visible' : 'none' }
+  });
+
+  map.on('click', 'peaje-clusters', (e) => {
+    const features = map.queryRenderedFeatures(e.point, { layers: ['peaje-clusters'] });
+    const clusterId = features[0].properties.cluster_id;
+    map.getSource('peajes-src').getClusterExpansionZoom(clusterId, (err, zoom) => {
+      if (err) return;
+      map.easeTo({ center: features[0].geometry.coordinates, zoom: zoom + 0.4, duration: 500 });
+    });
+  });
+  map.on('click', 'peajes-badge', (e) => showPeajePopup(e));
+  ['peaje-clusters','peajes-badge'].forEach(layer => {
+    map.on('mouseenter', layer, () => map.getCanvas().style.cursor = 'pointer');
+    map.on('mouseleave', layer, () => map.getCanvas().style.cursor = '');
+  });
+}
+
+function setPeajesLayersVisibility(visible){
+  peajesVisible = visible;
+  const vis = visible ? 'visible' : 'none';
+  ['peaje-clusters','peaje-cluster-icon','peaje-cluster-count','peajes-badge','peajes-icon'].forEach(l => {
+    if (map && map.getLayer(l)) map.setLayoutProperty(l, 'visibility', vis);
+  });
+}
+
+function showPeajePopup(e){
+  const idx = e.features[0].properties.idx;
+  const p = peajes[idx];
+  if (!p) return;
+  const coords = e.features[0].geometry.coordinates.slice();
+  const dist = Math.round(getDistanceMeters(currentPos.lat, currentPos.lon, p.lat, p.lon));
+  const tarifa = peajesTarifasMediasKm[p.pais];
+  const html = `<div class="radar-popup">
+      <div class="popup-title" style="color:#ffab00;">🛣️ ${p.nombre || (p.via ? 'Peaje ' + p.via : 'Peaje')}</div>
+      <table>
+        <tr><td>Vía</td><td>${p.via || '—'}</td></tr>
+        <tr><td>Tipo</td><td>${p.tipo === 'flujo_libre' ? 'Flujo libre (sin barrera)' : 'Barrera'}</td></tr>
+        <tr><td>Tarifa media país</td><td>${tarifa != null ? '≈ ' + tarifa.toFixed(2) + ' €/km' : 'no disponible'}</td></tr>
+        <tr><td>Distancia</td><td>${dist} m</td></tr>
+      </table>
+      <div style="font-size:0.66rem;color:var(--text-muted);margin-top:6px;">Coste estimado, no tarifa oficial del tramo.</div>
+    </div>`;
+  new maplibregl.Popup({ closeButton: true, offset: 14 }).setLngLat(coords).setHTML(html).addTo(map);
+}
+
+function setRouteHighlightPeajes(matched){
+  const feats = matched.map(m => ({
+    type:'Feature', geometry:{ type:'Point', coordinates:[m.peaje.lon, m.peaje.lat] },
+    properties:{ idx:m.idx, nombre:m.peaje.nombre || '', via:m.peaje.via || '' }
+  }));
+  const data = { type:'FeatureCollection', features: feats };
+
+  if (map.getSource('route-peajes-src')){
+    map.getSource('route-peajes-src').setData(data);
+  } else {
+    map.addSource('route-peajes-src', { type:'geojson', data });
+    map.addLayer({
+      id:'route-peajes-badge', type:'circle', source:'route-peajes-src',
+      paint:{ 'circle-radius': ['interpolate',['linear'],['zoom'],7,8,12,12,16,16], 'circle-color': '#ffab00',
+        'circle-stroke-width':3, 'circle-stroke-color':'#ffffff', 'circle-opacity':0.98 }
+    });
+    map.addLayer({
+      id:'route-peajes-icon', type:'symbol', source:'route-peajes-src',
+      layout:{ 'text-field':'🛣️', 'text-size':['interpolate',['linear'],['zoom'],7,9,16,13], 'text-allow-overlap':true }
+    });
+    map.on('click', 'route-peajes-badge', (e) => showPeajePopup(e));
+    map.on('mouseenter', 'route-peajes-badge', () => map.getCanvas().style.cursor = 'pointer');
+    map.on('mouseleave', 'route-peajes-badge', () => map.getCanvas().style.cursor = '');
+  }
+}
+function clearRouteHighlightPeajes(){
+  if (map.getSource('route-peajes-src')) map.getSource('route-peajes-src').setData({ type:'FeatureCollection', features: [] });
+}
+
+/* Detecta peajes a <400m de la ruta (mismo algoritmo acotado por bounding-box que
+   radares/gasolineras). Para estimar el coste NO tenemos tarifa por tramo real, así
+   que aproximamos: distancia (en línea recta, no por carretera) entre el primer y el
+   último peaje detectados en la ruta × tarifa media del país. Con 0 ó 1 peaje detectado
+   no hay "tramo" que estimar (puede ser un puente/túnel puntual con tarifa fija que no
+   conocemos), así que en ese caso mostramos un aviso en vez de inventar un número. */
+function markPeajesOnRoute(coords){
+  if (!peajes.length){
+    routePeajesStats = null;
+    clearRouteHighlightPeajes();
+    updatePeajeCostUI();
+    return;
+  }
+
+  let minLat=90,maxLat=-90,minLon=180,maxLon=-180;
+  for (const c of coords){
+    if (c[1]<minLat) minLat=c[1]; if (c[1]>maxLat) maxLat=c[1];
+    if (c[0]<minLon) minLon=c[0]; if (c[0]>maxLon) maxLon=c[0];
+  }
+  const buf = 0.03;
+  minLat-=buf; maxLat+=buf; minLon-=buf; maxLon+=buf;
+
+  const candidates = [];
+  peajes.forEach((p, index) => {
+    if (p.lat >= minLat && p.lat <= maxLat && p.lon >= minLon && p.lon <= maxLon){
+      candidates.push({ idx: index, peaje: p, lat: p.lat, lon: p.lon });
+    }
+  });
+
+  const matched = [];
+  const found = new Set();
+  for (let i = 0; i < coords.length && found.size < candidates.length; i++){
+    const clat = coords[i][1], clon = coords[i][0];
+    for (const cand of candidates){
+      if (found.has(cand.idx)) continue;
+      if (getDistanceMeters(clat, clon, cand.lat, cand.lon) < 400){
+        found.add(cand.idx);
+        cand.routeIdx = i; // posición aproximada a lo largo de la ruta, para poder ordenarlos
+        matched.push(cand);
+      }
+    }
+  }
+
+  if (!matched.length){
+    routePeajesStats = null;
+    clearRouteHighlightPeajes();
+    updatePeajeCostUI();
+    return;
+  }
+
+  matched.sort((a,b) => a.routeIdx - b.routeIdx);
+  setRouteHighlightPeajes(matched);
+
+  if (matched.length >= 2){
+    const first = matched[0], last = matched[matched.length - 1];
+    const tolledKm = getDistanceMeters(first.lat, first.lon, last.lat, last.lon) / 1000;
+    // país dominante entre los peajes detectados, para elegir la tarifa media
+    const counts = {};
+    matched.forEach(m => { counts[m.peaje.pais] = (counts[m.peaje.pais]||0) + 1; });
+    const paisDominante = Object.entries(counts).sort((a,b) => b[1]-a[1])[0][0];
+    const tarifa = peajesTarifasMediasKm[paisDominante] || 0.10;
+    const cost = tolledKm * tarifa;
+    routePeajesStats = { matched, tolledKm, cost, paisDominante, tarifa, estimable: true };
+  } else {
+    routePeajesStats = { matched, estimable: false };
+  }
+  updatePeajeCostUI();
+}
+
+function updatePeajeCostUI(){
+  if (!peajeCostCard) return;
+  if (!routePeajesStats || !routePeajesStats.matched || !routePeajesStats.matched.length){
+    peajeCostCard.style.display = 'none';
+    return;
+  }
+  peajeCostCard.style.display = 'flex';
+  if (routePeajesStats.estimable){
+    peajeCostValue.textContent = `≈ ${routePeajesStats.cost.toFixed(2)} €`;
+    peajeCostSub.textContent = `${routePeajesStats.matched.length} peajes detectados · ~${routePeajesStats.tolledKm.toFixed(0)} km de tramo · tarifa media ${routePeajesStats.paisDominante} (${routePeajesStats.tarifa.toFixed(2)}€/km) — estimado, no oficial`;
+  } else {
+    peajeCostValue.textContent = '1 peaje puntual';
+    peajeCostSub.textContent = 'Túnel/puente aislado — no hay tramo que estimar con tarifa por km. Consulta la tarifa fija en el operador.';
+  }
+}
+
+/* ============================================================
    BÚSQUEDA — motor tipo Google/Waze
    Nominatim (el que usábamos) está pensado para geocodificar direcciones
    completas, no para autocompletar mientras escribes: no hace "prefix
@@ -1953,6 +2209,7 @@ async function selectDestination(place){
   routeVariants.style.display = 'none';
   fuelCostCard.style.display = 'none';
   cheapestStationCard.style.display = 'none';
+  peajeCostCard.style.display = 'none';
   routePreviewSheet.style.display = 'flex';
 
   map.flyTo({ center: [selectedDestination.lon, selectedDestination.lat], zoom: 9, pitch: 0, bearing: 0 });
@@ -2018,6 +2275,7 @@ function applySelectedRoute(){
   drawRoutes();
   markRadaresOnRoute(routeCoords);
   markGasolinerasOnRoute(routeCoords);
+  markPeajesOnRoute(routeCoords);
 }
 
 function drawRoutes(){
@@ -2063,6 +2321,8 @@ function removeRouteLayers(){
   if (map.getSource('route-radares-src')) map.removeSource('route-radares-src');
   ['route-gasolineras-badge','route-gasolineras-icon','route-gasolineras-label'].forEach(l => { if (map.getLayer(l)) map.removeLayer(l); });
   if (map.getSource('route-gasolineras-src')) map.removeSource('route-gasolineras-src');
+  ['route-peajes-badge','route-peajes-icon'].forEach(l => { if (map.getLayer(l)) map.removeLayer(l); });
+  if (map.getSource('route-peajes-src')) map.removeSource('route-peajes-src');
 }
 
 function markRadaresOnRoute(coords){
@@ -2149,9 +2409,9 @@ cancelPreviewBtn.addEventListener('click', () => {
   routePreviewSheet.style.display = 'none';
   searchSheet.style.display = 'block';
   destInput.value = ''; searchClear.style.display = 'none';
-  removeRouteLayers(); clearRouteHighlightRadares(); clearRouteHighlightGasolineras();
-  routeGasolinerasStats = null;
-  fuelCostCard.style.display = 'none'; cheapestStationCard.style.display = 'none';
+  removeRouteLayers(); clearRouteHighlightRadares(); clearRouteHighlightGasolineras(); clearRouteHighlightPeajes();
+  routeGasolinerasStats = null; routePeajesStats = null;
+  fuelCostCard.style.display = 'none'; cheapestStationCard.style.display = 'none'; peajeCostCard.style.display = 'none';
   routeCoords = []; routesData = []; routeAnnotationSpeeds = [];
   map.flyTo({ center: [currentPos.lon, currentPos.lat], zoom: 15 });
 });
@@ -2167,8 +2427,8 @@ function stopNavigation(msg){
   if (msg) speak(msg);
   if (watchId !== null) navigator.geolocation.clearWatch(watchId);
   if (tripStats) finalizeTripStats(false); // viaje detenido a mitad: se guarda como incompleto
-  removeRouteLayers(); clearRouteHighlightRadares(); clearRouteHighlightGasolineras();
-  routeGasolinerasStats = null;
+  removeRouteLayers(); clearRouteHighlightRadares(); clearRouteHighlightGasolineras(); clearRouteHighlightPeajes();
+  routeGasolinerasStats = null; routePeajesStats = null;
   routeCoords = []; routesData = []; routeAnnotationSpeeds = [];
   map.easeTo({ pitch: 0, bearing: 0, duration: 700 });
 }
@@ -2780,6 +3040,13 @@ MAP_LABEL_FUELS.forEach(f => {
     if (map && gasolineras.length) setupGasolinerasClusterLayer();
   });
   mapLabelFuelRow.appendChild(el);
+});
+
+const peajesVisibleSwitch = document.getElementById('peajesVisibleSwitch');
+peajesVisibleSwitch.classList.toggle('on', peajesVisible);
+peajesVisibleSwitch.addEventListener('click', () => {
+  setPeajesLayersVisibility(!peajesVisible);
+  peajesVisibleSwitch.classList.toggle('on', peajesVisible);
 });
 
 // reinicio manual del mapa (radares/rutas)
