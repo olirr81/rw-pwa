@@ -601,6 +601,7 @@ body.theme-day .segmented button.active{ color:#fff; }
         <div class="field-label">Precio que se muestra en el icono del mapa</div>
         <div class="style-row" id="mapLabelFuelRow"></div>
       </div>
+      <div class="copilot-preview" id="gasolinerasFreshnessNote" style="display:none;"></div>
     </div>
 
     <div class="divider"></div>
@@ -1370,16 +1371,36 @@ function clearRouteHighlightRadares(){
    GASOLINERAS: precios reales (ES/FR/IT), capa con color por precio,
    detección en ruta y estimación de coste del trayecto
    ============================================================ */
+let gasolinerasEstadoPaises = {};
 async function loadGasolinerasData(){
   try{
     const res = await fetch('gasolineras.json?v=' + Date.now());
     const data = await res.json();
     gasolineras = data.estaciones || [];
+    gasolinerasEstadoPaises = data.estado_paises || {};
     console.log('Gasolineras cargadas:', gasolineras.length, '· países:', data.paises_incluidos);
+    renderGasolinerasFreshnessNote();
   }catch(e){
     console.error('Error al cargar gasolineras.json:', e);
     gasolineras = [];
   }
+}
+
+/* Nota de transparencia en Ajustes: si algún país se sirve de caché (no fresco hoy),
+   se lo decimos al usuario en vez de fingir que todo está al día. */
+function renderGasolinerasFreshnessNote(){
+  const el = document.getElementById('gasolinerasFreshnessNote');
+  if (!el) return;
+  const entries = Object.entries(gasolinerasEstadoPaises);
+  if (!entries.length){ el.style.display = 'none'; return; }
+  const stale = entries.filter(([,m]) => !m.fresco);
+  if (!stale.length){
+    el.style.display = 'block';
+    el.innerHTML = `✅ Precios al día en los ${entries.length} países cargados.`;
+    return;
+  }
+  el.style.display = 'block';
+  el.innerHTML = '⚠️ ' + stale.map(([pais, m]) => `${pais}: datos del ${m.fecha_datos || 'desconocido'} (la fuente oficial falló al actualizar)`).join(' · ');
 }
 
 /* Precio de una estación para un campo de combustible dado (con fallback al campo
@@ -1506,9 +1527,19 @@ function setGasolinerasLayersVisibility(visible){
   });
 }
 
-function precioListHTML(precios){
+function precioListHTML(precios, tendencias){
   const NAMES = { gasolina95:'Gasolina 95', gasolina98:'Gasolina 98', diesel:'Diésel', dieselPlus:'Diésel+', glp:'GLP', gnc:'GNC', gasolina95E10:'Gasolina E10', e85:'E85' };
-  return Object.entries(precios || {}).map(([k,v]) => `<tr><td>${NAMES[k] || k}</td><td>${v.toFixed(3)} €</td></tr>`).join('');
+  return Object.entries(precios || {}).map(([k,v]) => {
+    const t = (tendencias || {})[k];
+    let trendHTML = '';
+    if (t){
+      const arrow = t.direccion === 'sube' ? '▲' : (t.direccion === 'baja' ? '▼' : '▬');
+      const color = t.direccion === 'sube' ? '#ff3d1f' : (t.direccion === 'baja' ? '#00e676' : '#8991a3');
+      const sign = t.delta > 0 ? '+' : '';
+      trendHTML = ` <span style="color:${color};font-size:0.68rem;">${arrow} ${sign}${t.delta.toFixed(3)}€</span>`;
+    }
+    return `<tr><td>${NAMES[k] || k}</td><td>${v.toFixed(3)} €${trendHTML}</td></tr>`;
+  }).join('');
 }
 function showGasolineraPopup(e){
   const idx = e.features[0].properties.idx;
@@ -1516,10 +1547,14 @@ function showGasolineraPopup(e){
   if (!g) return;
   const coords = e.features[0].geometry.coordinates.slice();
   const dist = Math.round(getDistanceMeters(currentPos.lat, currentPos.lon, g.lat, g.lon));
+  const staleNote = (g.fresco === false)
+    ? `<div style="font-size:0.68rem;color:var(--warn);margin-top:3px;">⚠️ Precios del ${g.fecha_datos || 'último dato disponible'} (hoy no se pudo actualizar este país)</div>`
+    : '';
   const html = `<div class="radar-popup">
       <div class="popup-title" style="color:#0091d6;">⛽ ${g.rotulo || 'Gasolinera'}</div>
       <div style="font-size:0.76rem;color:var(--text-muted);margin-top:2px;">${g.direccion || ''}${g.municipio ? ', ' + g.municipio : ''}</div>
-      <table>${precioListHTML(g.precios)}<tr><td>Distancia</td><td>${dist} m</td></tr></table>
+      ${staleNote}
+      <table>${precioListHTML(g.precios, g.tendencias)}<tr><td>Distancia</td><td>${dist} m</td></tr></table>
     </div>`;
   new maplibregl.Popup({ closeButton: true, offset: 14 }).setLngLat(coords).setHTML(html).addTo(map);
 }
