@@ -2333,8 +2333,8 @@
   {
     "type": "node",
     "id": 992000927,
-    "lat": 37.3438201,
-    "lon": -5.9870784,
+    "lat": 37.3442483,
+    "lon": -5.987582,
     "tags": {
       "direction": "150",
       "highway": "speed_camera",
@@ -14378,6 +14378,21 @@
   },
   {
     "type": "node",
+    "id": 3412508891,
+    "lat": 37.4168441,
+    "lon": -5.9692233,
+    "tags": {
+      "crossing:markings": "no",
+      "crossing:signals": "no",
+      "highway": "speed_camera",
+      "maxspeed": "0",
+      "traffic_signals": "signal",
+      "traffic_signals:direction": "forward"
+    },
+    "country": "ES"
+  },
+  {
+    "type": "node",
     "id": 3467862621,
     "lat": 43.3477316,
     "lon": -2.9947215,
@@ -24988,10 +25003,12 @@
   {
     "type": "node",
     "id": 13421933334,
-    "lat": 40.6214376,
-    "lon": -3.7301626,
+    "lat": 40.6206004,
+    "lon": -3.7302527,
     "tags": {
-      "highway": "speed_camera"
+      "direction": "145",
+      "highway": "speed_camera",
+      "maxspeed": "60"
     },
     "country": "ES"
   },
@@ -25363,30 +25380,6 @@
       "direction": "350",
       "highway": "speed_camera",
       "maxspeed": "100"
-    },
-    "country": "ES"
-  },
-  {
-    "type": "node",
-    "id": 13436670127,
-    "lat": 42.6533677,
-    "lon": -5.5960021,
-    "tags": {
-      "direction": "300",
-      "highway": "speed_camera",
-      "maxspeed": "80"
-    },
-    "country": "ES"
-  },
-  {
-    "type": "node",
-    "id": 13436670128,
-    "lat": 42.6658985,
-    "lon": -5.5960935,
-    "tags": {
-      "direction": "280",
-      "highway": "speed_camera",
-      "maxspeed": "80"
     },
     "country": "ES"
   },
@@ -31174,6 +31167,64 @@
   },
   {
     "type": "node",
+    "id": 14166515810,
+    "lat": 37.8236215,
+    "lon": -0.7613316,
+    "tags": {
+      "direction": "145",
+      "highway": "speed_camera",
+      "maxspeed": "30"
+    },
+    "country": "ES"
+  },
+  {
+    "type": "node",
+    "id": 14169116116,
+    "lat": 37.3307159,
+    "lon": -5.8382026,
+    "tags": {
+      "direction": "280",
+      "highway": "speed_camera",
+      "maxspeed": "30"
+    },
+    "country": "ES"
+  },
+  {
+    "type": "node",
+    "id": 14169137330,
+    "lat": 37.3315651,
+    "lon": -5.8404621,
+    "tags": {
+      "direction": "280",
+      "highway": "speed_camera",
+      "maxspeed": "30"
+    },
+    "country": "ES"
+  },
+  {
+    "type": "node",
+    "id": 14170634961,
+    "lat": 40.4191829,
+    "lon": -3.6614552,
+    "tags": {
+      "highway": "speed_camera",
+      "name": "Habitual radar móvil"
+    },
+    "country": "ES"
+  },
+  {
+    "type": "node",
+    "id": 14173170778,
+    "lat": 37.5670746,
+    "lon": -5.8607385,
+    "tags": {
+      "highway": "speed_camera",
+      "maxspeed": "60"
+    },
+    "country": "ES"
+  },
+  {
+    "type": "node",
     "id": 51366154,
     "lat": 42.5232052,
     "lon": 1.5615159,
@@ -32706,8 +32757,8 @@
   {
     "type": "node",
     "id": 417234048,
-    "lat": 48.8868293,
-    "lon": 2.240929,
+    "lat": 48.8869192,
+    "lon": 2.2417373,
     "tags": {
       "highway": "speed_camera"
     },
@@ -33820,8 +33871,8 @@
   {
     "type": "node",
     "id": 769326283,
-    "lat": 43.8269249,
-    "lon": 3.3159286,
+    "lat": 43.8272787,
+    "lon": 3.3156998,
     "tags": {
       "highway": "speed_camera",
       "maxspeed": "80"
@@ -34436,8 +34487,8 @@
   {
     "type": "node",
     "id": 821696327,
-    "lat": 48.0667069,
-    "lon": 3.8111623,
+    "lat": 48.0664774,
+    "lon": 3.8112874,
     "tags": {
       "highway": "speed_camera",
       "maxspeed": "80",
@@ -36401,8 +36452,8 @@
   {
     "type": "node",
     "id": 1102467556,
-    "lat": 48.6396459,
-    "lon": 2.1532654,
+    "lat": 48.6397608,
+    "lon": 2.1534353,
     "tags": {
       "highway": "speed_camera",
       "man_made": "tower",
@@ -36571,9 +36622,10 @@
   {
     "type": "node",
     "id": 1132306866,
-    "lat": 43.5860099,
-    "lon": 1.4960607,
+    "lat": 43.5852064,
+    "lon": 1.4966169,
     "tags": {
+      "direction": "190",
       "highway": "speed_camera",
       "maxspeed": "90"
     },
@@ -37567,8 +37619,8 @@
   {
     "type": "node",
     "id": 1284086720,
-    "lat": 47.9625615,
-    "lon": 3.7285239,
+    "lat": 47.9629507,
+    "lon": 3.7285812,
     "tags": {
       "direction": "0",
       "highway": "speed_camera",
@@ -40077,12 +40129,13 @@
   {
     "type": "node",
     "id": 1407626700,
-    "lat": 48.8501313,
-    "lon": 2.5564353,
+    "lat": 48.8501214,
+    "lon": 2.5564652,
     "tags": {
       "direction": "140",
       "highway": "speed_camera",
-      "maxspeed": "50"
+      "maxspeed": "50",
+      "panoramax": "652d933b-89df-415b-a4ed-2abd1589afd3"
     },
     "country": "FR"
   },
@@ -42825,8 +42878,8 @@
   {
     "type": "node",
     "id": 1816356079,
-    "lat": 45.8538555,
-    "lon": 3.114852,
+    "lat": 45.8545014,
+    "lon": 3.1152926,
     "tags": {
       "highway": "speed_camera",
       "maxspeed": "110"
@@ -45603,11 +45656,12 @@
   {
     "type": "node",
     "id": 2012945940,
-    "lat": 43.5859594,
-    "lon": 1.4958624,
+    "lat": 43.5844045,
+    "lon": 1.496528,
     "tags": {
       "direction": "15",
-      "highway": "speed_camera"
+      "highway": "speed_camera",
+      "maxspeed": "90"
     },
     "country": "FR"
   },
@@ -52028,11 +52082,10 @@
   {
     "type": "node",
     "id": 2571052706,
-    "lat": 43.6800917,
-    "lon": 7.1287293,
+    "lat": 43.6806233,
+    "lon": 7.1286904,
     "tags": {
       "highway": "speed_camera",
-      "maxspeed": "70",
       "ref": "13679"
     },
     "country": "FR"
@@ -52092,17 +52145,6 @@
       "direction": "230",
       "highway": "speed_camera",
       "maxspeed": "90"
-    },
-    "country": "FR"
-  },
-  {
-    "type": "node",
-    "id": 2579404476,
-    "lat": 47.8547412,
-    "lon": 3.651763,
-    "tags": {
-      "highway": "speed_camera",
-      "maxspeed": "50"
     },
     "country": "FR"
   },
@@ -54881,8 +54923,8 @@
   {
     "type": "node",
     "id": 3073376805,
-    "lat": 50.8496612,
-    "lon": 1.7223165,
+    "lat": 50.8502932,
+    "lon": 1.7234493,
     "tags": {
       "highway": "speed_camera",
       "maxspeed": "130"
@@ -72903,8 +72945,8 @@
   {
     "type": "node",
     "id": 12324134363,
-    "lat": 43.1433943,
-    "lon": 6.0171229,
+    "lat": 43.1433913,
+    "lon": 6.0170644,
     "tags": {
       "direction": "280",
       "highway": "speed_camera",
@@ -75475,16 +75517,6 @@
   },
   {
     "type": "node",
-    "id": 13526663193,
-    "lat": 48.8630599,
-    "lon": 6.0733881,
-    "tags": {
-      "highway": "speed_camera"
-    },
-    "country": "FR"
-  },
-  {
-    "type": "node",
     "id": 13528786782,
     "lat": 43.1898775,
     "lon": 2.9117751,
@@ -76618,30 +76650,6 @@
   },
   {
     "type": "node",
-    "id": 14149216349,
-    "lat": 43.5844051,
-    "lon": 1.4965264,
-    "tags": {
-      "direction": "340",
-      "highway": "speed_camera",
-      "maxspeed": "90"
-    },
-    "country": "FR"
-  },
-  {
-    "type": "node",
-    "id": 14149216350,
-    "lat": 43.5851644,
-    "lon": 1.4966362,
-    "tags": {
-      "direction": "160",
-      "highway": "speed_camera",
-      "maxspeed": "90"
-    },
-    "country": "FR"
-  },
-  {
-    "type": "node",
     "id": 14153043295,
     "lat": 48.7844149,
     "lon": 2.5652245,
@@ -76659,6 +76667,81 @@
     "tags": {
       "highway": "speed_camera",
       "name": "Radar"
+    },
+    "country": "FR"
+  },
+  {
+    "type": "node",
+    "id": 14160311697,
+    "lat": 44.9732996,
+    "lon": 0.5898316,
+    "tags": {
+      "highway": "speed_camera"
+    },
+    "country": "FR"
+  },
+  {
+    "type": "node",
+    "id": 14165521171,
+    "lat": 49.4253731,
+    "lon": 4.5616322,
+    "tags": {
+      "highway": "speed_camera",
+      "name": "Radar"
+    },
+    "country": "FR"
+  },
+  {
+    "type": "node",
+    "id": 14165592196,
+    "lat": 48.9581451,
+    "lon": 4.3230858,
+    "tags": {
+      "highway": "speed_camera",
+      "name": "Radar"
+    },
+    "country": "FR"
+  },
+  {
+    "type": "node",
+    "id": 14165594831,
+    "lat": 49.2342033,
+    "lon": 4.5509539,
+    "tags": {
+      "highway": "speed_camera",
+      "name": "Radar"
+    },
+    "country": "FR"
+  },
+  {
+    "type": "node",
+    "id": 14165595711,
+    "lat": 49.1419487,
+    "lon": 3.6940258,
+    "tags": {
+      "highway": "speed_camera",
+      "name": "Radar"
+    },
+    "country": "FR"
+  },
+  {
+    "type": "node",
+    "id": 14165595851,
+    "lat": 49.1413612,
+    "lon": 4.5364938,
+    "tags": {
+      "highway": "speed_camera",
+      "name": "Radar"
+    },
+    "country": "FR"
+  },
+  {
+    "type": "node",
+    "id": 14168524336,
+    "lat": 43.6923886,
+    "lon": 7.2431083,
+    "tags": {
+      "highway": "speed_camera"
     },
     "country": "FR"
   },
@@ -77857,8 +77940,8 @@
   {
     "type": "node",
     "id": 247121425,
-    "lat": 51.6079196,
-    "lon": 6.677579,
+    "lat": 51.6078822,
+    "lon": 6.6776083,
     "tags": {
       "direction": "240",
       "highway": "speed_camera",
@@ -84360,17 +84443,6 @@
       "mapillary": "816187139038462",
       "mast:type": "column",
       "maxspeed": "50"
-    },
-    "country": "DE"
-  },
-  {
-    "type": "node",
-    "id": 631044427,
-    "lat": 48.3265513,
-    "lon": 7.9325229,
-    "tags": {
-      "highway": "speed_camera",
-      "maxspeed": "40"
     },
     "country": "DE"
   },
@@ -100078,30 +100150,6 @@
   },
   {
     "type": "node",
-    "id": 2561286762,
-    "lat": 49.9990097,
-    "lon": 7.9990692,
-    "tags": {
-      "highway": "speed_camera",
-      "maxspeed": "30",
-      "maxspeed:hgv": "30"
-    },
-    "country": "DE"
-  },
-  {
-    "type": "node",
-    "id": 2561286775,
-    "lat": 49.9992845,
-    "lon": 7.999149,
-    "tags": {
-      "highway": "speed_camera",
-      "maxspeed": "30",
-      "maxspeed:hgv": "30"
-    },
-    "country": "DE"
-  },
-  {
-    "type": "node",
     "id": 2561949314,
     "lat": 51.0706433,
     "lon": 6.8895419,
@@ -103114,8 +103162,8 @@
   {
     "type": "node",
     "id": 2979994543,
-    "lat": 49.6854395,
-    "lon": 8.9943073,
+    "lat": 49.685449,
+    "lon": 8.9943035,
     "tags": {
       "highway": "speed_camera",
       "maxspeed": "50"
@@ -111502,7 +111550,8 @@
     "lat": 51.2492407,
     "lon": 7.0462018,
     "tags": {
-      "highway": "speed_camera"
+      "highway": "speed_camera",
+      "maxspeed": "50"
     },
     "country": "DE"
   },
@@ -117288,6 +117337,7 @@
     "lat": 50.1875048,
     "lon": 9.0426845,
     "tags": {
+      "direction": "30;190",
       "highway": "speed_camera",
       "maxspeed": "30"
     },
@@ -122315,19 +122365,6 @@
   },
   {
     "type": "node",
-    "id": 6862258106,
-    "lat": 50.8821797,
-    "lon": 12.990047,
-    "tags": {
-      "direction": "185",
-      "highway": "speed_camera",
-      "maxspeed": "30",
-      "removed:highway": "speed_camera"
-    },
-    "country": "DE"
-  },
-  {
-    "type": "node",
     "id": 6865680468,
     "lat": 50.6782732,
     "lon": 6.205609,
@@ -123323,19 +123360,6 @@
     "tags": {
       "highway": "speed_camera",
       "maxspeed": "50"
-    },
-    "country": "DE"
-  },
-  {
-    "type": "node",
-    "id": 7228341324,
-    "lat": 50.8820126,
-    "lon": 12.9902778,
-    "tags": {
-      "direction": "280",
-      "highway": "speed_camera",
-      "maxspeed": "50",
-      "removed:highway": "speed_camera"
     },
     "country": "DE"
   },
@@ -132315,11 +132339,11 @@
   {
     "type": "node",
     "id": 10012356186,
-    "lat": 48.1570063,
-    "lon": 9.4722474,
+    "lat": 48.1572429,
+    "lon": 9.4723985,
     "tags": {
       "highway": "speed_camera",
-      "name": "Blitzer"
+      "maxspeed": "30"
     },
     "country": "DE"
   },
@@ -132528,21 +132552,6 @@
     "tags": {
       "highway": "speed_camera",
       "maxspeed": "50"
-    },
-    "country": "DE"
-  },
-  {
-    "type": "node",
-    "id": 10067024157,
-    "lat": 47.9691428,
-    "lon": 7.9786415,
-    "tags": {
-      "colour": "blue",
-      "direction": "130",
-      "height": "4",
-      "highway": "speed_camera",
-      "mapillary": "1169697087616137",
-      "note": "Es handelt sich um eine blau/grüne Mautsäule, Korrektur gemäß:\nhttps://wiki.openstreetmap.org/wiki/Key:toll"
     },
     "country": "DE"
   },
@@ -133585,6 +133594,7 @@
     "lat": 51.3190534,
     "lon": 12.349706,
     "tags": {
+      "colour": "black",
       "direction": "90",
       "highway": "speed_camera",
       "mapillary": "910806070024522",
@@ -134410,8 +134420,7 @@
     "lon": 9.6638985,
     "tags": {
       "highway": "speed_camera",
-      "maxspeed": "50",
-      "note": "unbekannte Ausrichtung"
+      "maxspeed": "50"
     },
     "country": "DE"
   },
@@ -140490,6 +140499,30 @@
   },
   {
     "type": "node",
+    "id": 14159239702,
+    "lat": 50.5265965,
+    "lon": 12.3781245,
+    "tags": {
+      "direction": "320;140",
+      "highway": "speed_camera",
+      "maxspeed": "70"
+    },
+    "country": "DE"
+  },
+  {
+    "type": "node",
+    "id": 14175723072,
+    "lat": 52.3845068,
+    "lon": 9.6637388,
+    "tags": {
+      "direction": "130",
+      "highway": "speed_camera",
+      "maxspeed": "50"
+    },
+    "country": "DE"
+  },
+  {
+    "type": "node",
     "id": 14905772,
     "lat": 42.0874242,
     "lon": 11.7986491,
@@ -143184,7 +143217,8 @@
     "lat": 45.8161813,
     "lon": 9.0579008,
     "tags": {
-      "highway": "speed_camera"
+      "highway": "speed_camera",
+      "operator": "Autostrade per l'Italia S.p.A."
     },
     "country": "IT"
   },
@@ -144159,7 +144193,8 @@
     "lon": 8.9386474,
     "tags": {
       "comment": "Tutor",
-      "highway": "speed_camera"
+      "highway": "speed_camera",
+      "operator": "Autostrade per l'Italia S.p.A."
     },
     "country": "IT"
   },
@@ -144170,7 +144205,8 @@
     "lon": 8.991297,
     "tags": {
       "comment": "Tutor",
-      "highway": "speed_camera"
+      "highway": "speed_camera",
+      "operator": "Autostrade per l'Italia S.p.A."
     },
     "country": "IT"
   },
@@ -144353,7 +144389,8 @@
     "lon": 8.977454,
     "tags": {
       "comment": "Tutor",
-      "highway": "speed_camera"
+      "highway": "speed_camera",
+      "operator": "Autostrade per l'Italia S.p.A."
     },
     "country": "IT"
   },
@@ -158236,7 +158273,7 @@
     "lat": 43.7898982,
     "lon": 11.286755,
     "tags": {
-      "direction": "195",
+      "direction": "15",
       "highway": "speed_camera",
       "maxspeed": "30"
     },
@@ -164093,17 +164130,6 @@
     "tags": {
       "highway": "speed_camera",
       "maxspeed": "50"
-    },
-    "country": "IT"
-  },
-  {
-    "type": "node",
-    "id": 5605422545,
-    "lat": 43.9824248,
-    "lon": 12.3046895,
-    "tags": {
-      "direction": "225",
-      "highway": "speed_camera"
     },
     "country": "IT"
   },
@@ -170978,7 +171004,7 @@
     "lat": 43.8024867,
     "lon": 11.2900382,
     "tags": {
-      "direction": "130",
+      "direction": "3200",
       "highway": "speed_camera",
       "maxspeed": "50"
     },
@@ -170990,7 +171016,7 @@
     "lat": 43.7932754,
     "lon": 11.2865644,
     "tags": {
-      "direction": "340",
+      "direction": "150",
       "highway": "speed_camera",
       "maxspeed": "30"
     },
@@ -172896,16 +172922,6 @@
   },
   {
     "type": "node",
-    "id": 8037493335,
-    "lat": 45.8100072,
-    "lon": 8.7953001,
-    "tags": {
-      "highway": "speed_camera"
-    },
-    "country": "IT"
-  },
-  {
-    "type": "node",
     "id": 8038755133,
     "lat": 43.3234748,
     "lon": 11.3324399,
@@ -174158,16 +174174,6 @@
   },
   {
     "type": "node",
-    "id": 8415743137,
-    "lat": 45.8198567,
-    "lon": 8.8091735,
-    "tags": {
-      "highway": "speed_camera"
-    },
-    "country": "IT"
-  },
-  {
-    "type": "node",
     "id": 8422658682,
     "lat": 42.4084546,
     "lon": 14.1650953,
@@ -174234,17 +174240,6 @@
   },
   {
     "type": "node",
-    "id": 8432176035,
-    "lat": 45.8250135,
-    "lon": 8.8078028,
-    "tags": {
-      "highway": "speed_camera",
-      "maxspeed": "50"
-    },
-    "country": "IT"
-  },
-  {
-    "type": "node",
     "id": 8432675290,
     "lat": 43.7035205,
     "lon": 10.6847671,
@@ -174264,16 +174259,6 @@
       "direction": "forward",
       "highway": "speed_camera",
       "maxspeed": "90"
-    },
-    "country": "IT"
-  },
-  {
-    "type": "node",
-    "id": 8435598604,
-    "lat": 45.8450147,
-    "lon": 8.8031488,
-    "tags": {
-      "highway": "speed_camera"
     },
     "country": "IT"
   },
@@ -174611,26 +174596,6 @@
     "id": 8664356509,
     "lat": 42.8551783,
     "lon": 13.818535,
-    "tags": {
-      "highway": "speed_camera"
-    },
-    "country": "IT"
-  },
-  {
-    "type": "node",
-    "id": 8684442983,
-    "lat": 45.8327182,
-    "lon": 8.8215075,
-    "tags": {
-      "highway": "speed_camera"
-    },
-    "country": "IT"
-  },
-  {
-    "type": "node",
-    "id": 8684442984,
-    "lat": 45.8338826,
-    "lon": 8.8201571,
     "tags": {
       "highway": "speed_camera"
     },
@@ -175119,27 +175084,6 @@
     "lon": 8.7525817,
     "tags": {
       "highway": "speed_camera"
-    },
-    "country": "IT"
-  },
-  {
-    "type": "node",
-    "id": 8880737977,
-    "lat": 45.835469,
-    "lon": 8.7959147,
-    "tags": {
-      "highway": "speed_camera"
-    },
-    "country": "IT"
-  },
-  {
-    "type": "node",
-    "id": 8880737984,
-    "lat": 45.8400265,
-    "lon": 8.7956316,
-    "tags": {
-      "highway": "speed_camera",
-      "maxspeed": "50"
     },
     "country": "IT"
   },
@@ -187833,8 +187777,8 @@
   {
     "type": "node",
     "id": 12066202872,
-    "lat": 45.73435,
-    "lon": 10.4573704,
+    "lat": 45.7343422,
+    "lon": 10.4573737,
     "tags": {
       "colour": "green",
       "highway": "speed_camera",
@@ -187857,8 +187801,8 @@
   {
     "type": "node",
     "id": 12066202886,
-    "lat": 45.7348817,
-    "lon": 10.4588315,
+    "lat": 45.734888,
+    "lon": 10.4588605,
     "tags": {
       "colour": "green",
       "highway": "speed_camera",
@@ -187869,8 +187813,8 @@
   {
     "type": "node",
     "id": 12066202888,
-    "lat": 45.735579,
-    "lon": 10.4598467,
+    "lat": 45.7355909,
+    "lon": 10.4598443,
     "tags": {
       "colour": "green",
       "highway": "speed_camera",
@@ -197910,6 +197854,113 @@
   },
   {
     "type": "node",
+    "id": 14157179231,
+    "lat": 44.607229,
+    "lon": 10.776887,
+    "tags": {
+      "direction": "180",
+      "highway": "speed_camera",
+      "maxspeed": "70"
+    },
+    "country": "IT"
+  },
+  {
+    "type": "node",
+    "id": 14157194130,
+    "lat": 44.597695,
+    "lon": 10.7772891,
+    "tags": {
+      "direction": "15",
+      "highway": "speed_camera",
+      "maxspeed": "70"
+    },
+    "country": "IT"
+  },
+  {
+    "type": "node",
+    "id": 14158631103,
+    "lat": 45.8105798,
+    "lon": 10.543735,
+    "tags": {
+      "highway": "speed_camera"
+    },
+    "country": "IT"
+  },
+  {
+    "type": "node",
+    "id": 14159137017,
+    "lat": 46.1649563,
+    "lon": 9.9907102,
+    "tags": {
+      "highway": "speed_camera",
+      "maxspeed": "50"
+    },
+    "country": "IT"
+  },
+  {
+    "type": "node",
+    "id": 14159506616,
+    "lat": 42.7349612,
+    "lon": 11.1281404,
+    "tags": {
+      "highway": "speed_camera"
+    },
+    "country": "IT"
+  },
+  {
+    "type": "node",
+    "id": 14160106924,
+    "lat": 45.7819671,
+    "lon": 11.8720785,
+    "tags": {
+      "highway": "speed_camera",
+      "maxspeed": "50"
+    },
+    "country": "IT"
+  },
+  {
+    "type": "node",
+    "id": 14160106926,
+    "lat": 45.7914573,
+    "lon": 11.8644142,
+    "tags": {
+      "highway": "speed_camera"
+    },
+    "country": "IT"
+  },
+  {
+    "type": "node",
+    "id": 14160106927,
+    "lat": 45.7965262,
+    "lon": 11.8627158,
+    "tags": {
+      "highway": "speed_camera"
+    },
+    "country": "IT"
+  },
+  {
+    "type": "node",
+    "id": 14165544582,
+    "lat": 45.8961023,
+    "lon": 11.9425528,
+    "tags": {
+      "highway": "speed_camera"
+    },
+    "country": "IT"
+  },
+  {
+    "type": "node",
+    "id": 14168975266,
+    "lat": 44.9771064,
+    "lon": 10.7320852,
+    "tags": {
+      "highway": "speed_camera",
+      "maxspeed": "90"
+    },
+    "country": "IT"
+  },
+  {
+    "type": "node",
     "id": 455305,
     "lat": 47.2324759,
     "lon": 8.6217428,
@@ -202218,7 +202269,6 @@
       "direction": "240",
       "highway": "speed_camera",
       "image": "https://kartaview.org/details/3846401/113",
-      "man_made": "mast",
       "maxspeed": "50"
     },
     "country": "CH"
@@ -203434,7 +203484,6 @@
       "direction": "240",
       "highway": "speed_camera",
       "image": "https://kartaview.org/details/3846401/113",
-      "man_made": "mast",
       "maxspeed": "50"
     },
     "country": "CH"
@@ -204752,6 +204801,17 @@
       "highway": "speed_camera",
       "maxspeed": "50",
       "start_date": "2026-04"
+    },
+    "country": "CH"
+  },
+  {
+    "type": "node",
+    "id": 14170588550,
+    "lat": 47.1338724,
+    "lon": 7.2498215,
+    "tags": {
+      "fixme": "details?",
+      "highway": "speed_camera"
     },
     "country": "CH"
   },
@@ -207040,6 +207100,18 @@
     "lon": 12.1760399,
     "tags": {
       "highway": "speed_camera"
+    },
+    "country": "AT"
+  },
+  {
+    "type": "node",
+    "id": 1368343859,
+    "lat": 47.946073,
+    "lon": 14.800454,
+    "tags": {
+      "direction": "W",
+      "highway": "speed_camera",
+      "maxspeed": "30"
     },
     "country": "AT"
   },
@@ -214194,18 +214266,6 @@
   },
   {
     "type": "node",
-    "id": 7481754294,
-    "lat": 47.9460518,
-    "lon": 14.8004945,
-    "tags": {
-      "direction": "Stadteinwärts",
-      "highway": "speed_camera",
-      "maxspeed": "30"
-    },
-    "country": "AT"
-  },
-  {
-    "type": "node",
     "id": 7481754295,
     "lat": 47.9558012,
     "lon": 14.7801658,
@@ -220689,6 +220749,17 @@
     "lon": 16.4866688,
     "tags": {
       "direction": "190",
+      "highway": "speed_camera",
+      "maxspeed": "30"
+    },
+    "country": "AT"
+  },
+  {
+    "type": "node",
+    "id": 14173874335,
+    "lat": 47.8008303,
+    "lon": 13.0680518,
+    "tags": {
       "highway": "speed_camera",
       "maxspeed": "30"
     },
